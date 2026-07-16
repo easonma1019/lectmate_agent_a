@@ -1,0 +1,144 @@
+{
+  "course_id": "coding_explorers_803924",
+  "subject": "Coding",
+  "age_bracket": "Explorers (6-9)",
+  "topic": "Introduction to algorithms through stories",
+  "pedagogy": {
+    "tier": 1,
+    "cognitive_theory": "Piaget concrete operational",
+    "csta_level": "Level 1A (K-2)",
+    "raw_text_code_allowed": "never",
+    "content_format": "story+visual",
+    "metaphor_story": "mandatory",
+    "exercise_types": [
+      "sequence_ordering",
+      "drag_drop_blocks",
+      "spot_the_error_visual",
+      "story_completion"
+    ],
+    "mini_project_type": "animation / interactive story / simple game",
+    "max_session_min": 20,
+    "tester_mode": "logic_check",
+    "tutor_guide_style": "physical_analogy_script",
+    "feedback_style": "immediate_visual",
+    "key_csta_standards": [
+      "1A-AP-08",
+      "1A-AP-10",
+      "1A-AP-11",
+      "1A-AP-15"
+    ]
+  },
+  "relevancy_note": "[stub] Relevancy check not run — no LLM available.",
+  "references": [
+    {
+      "title": "CSTA K-12 Computer Science Standards (2017)",
+      "kind": "standard",
+      "identifier": "https://csteachers.org/k12standards/"
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "m1",
+      "title": "What is a program?",
+      "objective": "Understand what is a program",
+      "prerequisites": [],
+      "target_minutes": 15,
+      "exercise_type": "sequence_ordering",
+      "csta_alignment": [
+        "1A-AP-08"
+      ]
+    },
+    {
+      "module_id": "m2",
+      "title": "Step-by-step instructions",
+      "objective": "Understand sequences and instructions",
+      "prerequisites": [
+        "m1"
+      ],
+      "target_minutes": 15,
+      "exercise_type": "sequence_ordering",
+      "csta_alignment": [
+        "1A-AP-08"
+      ]
+    },
+    {
+      "module_id": "m3",
+      "title": "Variables: the labelled box",
+      "objective": "Understand variables",
+      "prerequisites": [
+        "m2"
+      ],
+      "target_minutes": 15,
+      "exercise_type": "sequence_ordering",
+      "csta_alignment": [
+        "1A-AP-08"
+      ]
+    },
+    {
+      "module_id": "m4",
+      "title": "Talking to the user: input and output",
+      "objective": "Understand input output",
+      "prerequisites": [
+        "m3"
+      ],
+      "target_minutes": 15,
+      "exercise_type": "sequence_ordering",
+      "csta_alignment": [
+        "1A-AP-08"
+      ]
+    },
+    {
+      "module_id": "m5",
+      "title": "Making decisions: conditionals",
+      "objective": "Understand conditionals",
+      "prerequisites": [
+        "m4"
+      ],
+      "target_minutes": 15,
+      "exercise_type": "sequence_ordering",
+      "csta_alignment": [
+        "1A-AP-08"
+      ]
+    },
+    {
+      "module_id": "m6",
+      "title": "Doing things again: loops",
+      "objective": "Understand loops",
+      "prerequisites": [
+        "m5"
+      ],
+      "target_minutes": 15,
+      "exercise_type": "sequence_ordering",
+      "csta_alignment": [
+        "1A-AP-08"
+      ]
+    },
+    {
+      "module_id": "m7",
+      "title": "Collections: lists",
+      "objective": "Understand lists",
+      "prerequisites": [
+        "m6"
+      ],
+      "target_minutes": 15,
+      "exercise_type": "sequence_ordering",
+      "csta_alignment": [
+        "1A-AP-08"
+      ]
+    },
+    {
+      "module_id": "m8",
+      "title": "Reusable steps: functions",
+      "objective": "Understand functions",
+      "prerequisites": [
+        "m7"
+      ],
+      "target_minutes": 15,
+      "exercise_type": "sequence_ordering",
+      "csta_alignment": [
+        "1A-AP-08"
+      ]
+    }
+  ],
+  "schema_version": "0.2.0"
+}

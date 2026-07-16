@@ -1,0 +1,120 @@
+{
+  "course_id": "coding_creators_5c414e",
+  "subject": "Coding",
+  "age_bracket": "Creators (10-13)",
+  "topic": "Python fundamentals",
+  "pedagogy": {
+    "tier": 2,
+    "cognitive_theory": "Vygotsky ZPD + scaffolding",
+    "csta_level": "Level 1B + Level 2 (Gr 3-8)",
+    "raw_text_code_allowed": "limited",
+    "content_format": "scaffold_text",
+    "metaphor_story": "recommended",
+    "exercise_types": [
+      "fill_in_the_blank",
+      "fix_the_bug_simple",
+      "short_write_max5lines",
+      "flowchart_design"
+    ],
+    "mini_project_type": "calculator / quiz game / simple utility",
+    "max_session_min": 35,
+    "tester_mode": "simple_exec",
+    "tutor_guide_style": "scaffolded_hint_sequence",
+    "feedback_style": "immediate_plus_explain_why",
+    "key_csta_standards": [
+      "1B-AP-08",
+      "1B-AP-10",
+      "1B-AP-15",
+      "2-AP-10",
+      "2-AP-13",
+      "2-AP-17"
+    ]
+  },
+  "relevancy_note": "[stub] Relevancy check not run — no LLM available.",
+  "references": [
+    {
+      "title": "CSTA K-12 Computer Science Standards (2017)",
+      "kind": "standard",
+      "identifier": "https://csteachers.org/k12standards/"
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "m1",
+      "title": "What is a program?",
+      "objective": "Understand what is a program",
+      "prerequisites": [],
+      "target_minutes": 30,
+      "exercise_type": "fill_in_the_blank",
+      "csta_alignment": [
+        "1B-AP-08"
+      ]
+    },
+    {
+      "module_id": "m2",
+      "title": "Step-by-step instructions",
+      "objective": "Understand sequences and instructions",
+      "prerequisites": [
+        "m1"
+      ],
+      "target_minutes": 30,
+      "exercise_type": "fill_in_the_blank",
+      "csta_alignment": [
+        "1B-AP-08"
+      ]
+    },
+    {
+      "module_id": "m3",
+      "title": "Variables: the labelled box",
+      "objective": "Understand variables",
+      "prerequisites": [
+        "m2"
+      ],
+      "target_minutes": 30,
+      "exercise_type": "fill_in_the_blank",
+      "csta_alignment": [
+        "1B-AP-08"
+      ]
+    },
+    {
+      "module_id": "m4",
+      "title": "Talking to the user: input and output",
+      "objective": "Understand input output",
+      "prerequisites": [
+        "m3"
+      ],
+      "target_minutes": 30,
+      "exercise_type": "fill_in_the_blank",
+      "csta_alignment": [
+        "1B-AP-08"
+      ]
+    },
+    {
+      "module_id": "m5",
+      "title": "Making decisions: conditionals",
+      "objective": "Understand conditionals",
+      "prerequisites": [
+        "m4"
+      ],
+      "target_minutes": 30,
+      "exercise_type": "fill_in_the_blank",
+      "csta_alignment": [
+        "1B-AP-08"
+      ]
+    },
+    {
+      "module_id": "m6",
+      "title": "Doing things again: loops",
+      "objective": "Understand loops",
+      "prerequisites": [
+        "m5"
+      ],
+      "target_minutes": 30,
+      "exercise_type": "fill_in_the_blank",
+      "csta_alignment": [
+        "1B-AP-08"
+      ]
+    }
+  ],
+  "schema_version": "0.2.0"
+}
