@@ -45,9 +45,18 @@ export ANTHROPIC_API_KEY=sk-...
 python -m agent_a.cli --subject Coding --age "Creators (10-13)" \
     --topic "Python fundamentals" --out spec.json
 
+# Human review page (prints a file:// link for curriculum designers)
+python -m agent_a.cli --subject Coding --age "Creators (10-13)" \
+    --topic "Python fundamentals" --stub --out spec.json --html review.html
+
 # Tests
 python -m pytest tests/ -q
 ```
+
+`--out` keeps the machine-readable CourseSpec JSON for Agent B/C handoff.
+`--html` writes a self-contained review page with the course outline,
+pedagogy constraints, references, relevancy note, and a collapsible raw JSON
+section.
 
 Python usage:
 

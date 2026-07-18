@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
+from pathlib import Path
 
+from .html_report import write_course_spec_html
 from .planner import plan_course
 from .schemas import AgeBracket, CourseRequest, Subject
 
@@ -18,6 +19,16 @@ def main() -> int:
     p.add_argument("--modules", type=int, default=None)
     p.add_argument("--stub", action="store_true", help="force stub mode (no LLM)")
     p.add_argument("--out", default=None, help="write JSON to file instead of stdout")
+    p.add_argument(
+        "--html",
+        nargs="?",
+        const="",
+        default=None,
+        help=(
+            "write a human review HTML page. Pass a path, or omit the value "
+            "to use <course_id>_review.html"
+        ),
+    )
     args = p.parse_args()
 
     req = CourseRequest(
@@ -35,6 +46,17 @@ def main() -> int:
         print(f"course spec written to {args.out}", file=sys.stderr)
     else:
         print(payload)
+    if args.html is not None:
+        html_path = (
+            Path(args.html)
+            if args.html
+            else Path(f"{spec.course_id}_review.html")
+        )
+        written_path = write_course_spec_html(spec, html_path)
+        print(
+            f"course review page written to {written_path.as_uri()}",
+            file=sys.stderr,
+        )
     return 0
 
 

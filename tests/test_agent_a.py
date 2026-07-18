@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from agent_a import AgeBracket, CourseRequest, Subject, plan_course, rule_check
 from agent_a.concept_graph import toposort_check
+from agent_a.html_report import render_course_spec_html, write_course_spec_html
 from agent_a.pedagogy import lookup
 from agent_a.schemas import CourseSpec, ModuleSpec
 
@@ -44,6 +45,20 @@ def test_module_count_follows_pacing_template():
 def test_max_modules_override():
     spec = plan_course(_req(max_modules=3), use_llm=False)
     assert len(spec.modules) == 3
+
+
+def test_html_report_renders_course_review_page(tmp_path):
+    spec = plan_course(_req(max_modules=2), use_llm=False)
+
+    html = render_course_spec_html(spec)
+    assert "LectMate Agent A Course Review" in html
+    assert "Python fundamentals" in html
+    assert spec.modules[0].title in html
+    assert "Raw CourseSpec JSON" in html
+
+    output_path = write_course_spec_html(spec, tmp_path / "review.html")
+    assert output_path.exists()
+    assert output_path.as_uri().startswith("file://")
 
 
 # --- schema guards ----------------------------------------------------------
