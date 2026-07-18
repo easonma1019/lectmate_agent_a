@@ -34,7 +34,7 @@ Design decisions traceable to project docs:
 ## Run it
 
 ```bash
-pip install pydantic anthropic pytest
+pip install -r requirements.txt
 
 # Stub mode (no API key, deterministic — for B/C to integrate against)
 python -m agent_a.cli --subject Coding --age "Creators (10-13)" \
