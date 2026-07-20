@@ -1,16 +1,15 @@
-"""Human-readable HTML review report for CourseSpec objects."""
+"""Human-readable Level A/B/C HTML pages for CourseSpec objects."""
 from __future__ import annotations
 
-import json
 from html import escape
 from pathlib import Path
 
-from .schemas import CourseSpec
+from .schemas import CoursePhase, CourseSpec
 
 
 def _items(values: list[str]) -> str:
     if not values:
-        return '<span class="muted">None</span>'
+        return '<li class="muted">None</li>'
     return "".join(f"<li>{escape(value)}</li>" for value in values)
 
 
@@ -20,41 +19,121 @@ def _chips(values: list[str]) -> str:
     return "".join(f'<span class="chip">{escape(value)}</span>' for value in values)
 
 
-def _module_rows(spec: CourseSpec) -> str:
-    rows: list[str] = []
-    for module in spec.modules:
-        prerequisites = (
-            ", ".join(module.prerequisites)
-            if module.prerequisites
-            else "None"
+def _age_group(spec: CourseSpec) -> str:
+    value = spec.age_bracket.value
+    if "(" in value and ")" in value:
+        return value.split("(", 1)[1].split(")", 1)[0]
+    return value
+
+
+def _level(spec: CourseSpec) -> str:
+    return spec.overview.level or f"Tier {spec.pedagogy.tier}"
+
+
+def _lesson_range(spec: CourseSpec) -> str:
+    if spec.overview.lesson_range:
+        return spec.overview.lesson_range
+    return f"{len(spec.modules)} modules"
+
+
+def _duration(spec: CourseSpec) -> str:
+    if spec.overview.duration:
+        return spec.overview.duration
+    return "Tutor-paced"
+
+
+def _description(spec: CourseSpec) -> str:
+    if spec.overview.one_sentence_description:
+        return spec.overview.one_sentence_description
+    return f"Learn {spec.topic} through a structured, age-appropriate course journey."
+
+
+def _skill_tags(spec: CourseSpec) -> list[str]:
+    if spec.overview.skill_tags:
+        return spec.overview.skill_tags
+    return [spec.subject.value, spec.topic]
+
+
+def _module_lookup(spec: CourseSpec):
+    return {module.module_id: module for module in spec.modules}
+
+
+def _fallback_phases(spec: CourseSpec) -> list[CoursePhase]:
+    if spec.phases:
+        return spec.phases
+
+    module_count = len(spec.modules)
+    phase_count = min(3, module_count)
+    phase_titles = ["Foundations", "Core Skills", "Applied Practice"]
+    phases: list[CoursePhase] = []
+    for index in range(phase_count):
+        start = (index * module_count) // phase_count + 1
+        end = ((index + 1) * module_count) // phase_count
+        phases.append(
+            CoursePhase(
+                phase_id=f"p{index + 1}",
+                title=phase_titles[index],
+                module_ids=[
+                    f"m{module_index}"
+                    for module_index in range(start, end + 1)
+                ],
+            )
         )
-        rows.append(
+    return phases
+
+
+def _phase_sections(spec: CourseSpec) -> str:
+    modules = _module_lookup(spec)
+    sections: list[str] = []
+    for phase in _fallback_phases(spec):
+        module_rows: list[str] = []
+        for module_id in phase.module_ids:
+            module = modules[module_id]
+            prerequisites = (
+                ", ".join(module.prerequisites)
+                if module.prerequisites
+                else "None"
+            )
+            module_rows.append(
+                f"""
+                <article class="module">
+                  <div class="module-head">
+                    <span class="module-id">{escape(module.module_id)}</span>
+                    <h4>{escape(module.title)}</h4>
+                  </div>
+                  <p>{escape(module.objective)}</p>
+                  <dl class="module-meta">
+                    <div>
+                      <dt>Minutes</dt>
+                      <dd>{module.target_minutes}</dd>
+                    </div>
+                    <div>
+                      <dt>Exercise</dt>
+                      <dd>{escape(module.exercise_type)}</dd>
+                    </div>
+                    <div>
+                      <dt>Prerequisites</dt>
+                      <dd>{escape(prerequisites)}</dd>
+                    </div>
+                  </dl>
+                  <div class="chips">{_chips(module.csta_alignment)}</div>
+                </article>
+                """
+            )
+        sections.append(
             f"""
-            <article class="module">
-              <div class="module-head">
-                <span class="module-id">{escape(module.module_id)}</span>
-                <h3>{escape(module.title)}</h3>
+            <section class="phase">
+              <div class="phase-head">
+                <span>{escape(phase.phase_id.upper())}</span>
+                <h3>{escape(phase.title)}</h3>
               </div>
-              <p class="objective">{escape(module.objective)}</p>
-              <dl class="module-meta">
-                <div>
-                  <dt>Minutes</dt>
-                  <dd>{module.target_minutes}</dd>
-                </div>
-                <div>
-                  <dt>Exercise</dt>
-                  <dd>{escape(module.exercise_type)}</dd>
-                </div>
-                <div>
-                  <dt>Prerequisites</dt>
-                  <dd>{escape(prerequisites)}</dd>
-                </div>
-              </dl>
-              <div class="chips">{_chips(module.csta_alignment)}</div>
-            </article>
+              <div class="module-list">
+                {"".join(module_rows)}
+              </div>
+            </section>
             """
         )
-    return "\n".join(rows)
+    return "".join(sections)
 
 
 def _reference_rows(spec: CourseSpec) -> str:
@@ -89,155 +168,230 @@ def _reference_rows(spec: CourseSpec) -> str:
 
 
 def render_course_spec_html(spec: CourseSpec) -> str:
-    """Render a CourseSpec as a self-contained HTML page."""
+    """Render Level A, B, and C course pages in one self-contained HTML file."""
 
     raw_json = spec.model_dump_json(indent=2)
+    overview = spec.overview
     ped = spec.pedagogy
+
+    learn_items = overview.what_you_will_learn or [
+        module.objective
+        for module in spec.modules[:6]
+    ]
+    outcomes = overview.learning_outcomes or [
+        module.objective
+        for module in spec.modules
+    ]
 
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{escape(spec.topic)} - Course Review</title>
+  <title>{escape(spec.topic)} - Course Pages</title>
   <style>
     :root {{
       color-scheme: light;
-      --ink: #1c2430;
-      --muted: #647084;
-      --line: #d9e0ea;
+      --ink: #17202a;
+      --muted: #667085;
+      --line: #d7dde6;
       --paper: #ffffff;
-      --surface: #f5f7fb;
+      --surface: #f4f6f8;
       --accent: #0f766e;
       --accent-soft: #dff4f0;
-      --warn: #a16207;
-      --warn-soft: #fff4cc;
+      --blue: #1d4ed8;
+      --blue-soft: #e7efff;
+      --gold: #9a6500;
+      --gold-soft: #fff4d7;
     }}
     * {{ box-sizing: border-box; }}
     body {{
       margin: 0;
       background: var(--surface);
       color: var(--ink);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-        "Segoe UI", sans-serif;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", sans-serif;
       line-height: 1.5;
     }}
     main {{
-      max-width: 1120px;
+      max-width: 1180px;
       margin: 0 auto;
-      padding: 32px 20px 48px;
+      padding: 28px 20px 48px;
     }}
-    header {{
+    .topbar {{
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      padding-bottom: 20px;
       border-bottom: 1px solid var(--line);
-      padding-bottom: 22px;
-      margin-bottom: 24px;
+      margin-bottom: 18px;
     }}
     .eyebrow {{
       color: var(--accent);
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 800;
       letter-spacing: 0;
       text-transform: uppercase;
     }}
     h1 {{
-      font-size: 34px;
-      line-height: 1.15;
-      margin: 8px 0 10px;
+      font-size: 36px;
+      line-height: 1.12;
+      margin: 8px 0 8px;
     }}
     h2 {{
-      font-size: 20px;
+      font-size: 22px;
       margin: 0 0 14px;
     }}
     h3 {{
-      font-size: 17px;
+      font-size: 18px;
       margin: 0;
     }}
-    .summary {{
+    h4 {{
+      font-size: 16px;
+      margin: 0;
+    }}
+    .page {{
+      margin: 18px 0;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+    }}
+    .page-label {{
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 9px;
+      border-radius: 6px;
+      background: var(--blue-soft);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }}
+    .landing-card {{
+      max-width: 640px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      background: #fbfcfe;
+    }}
+    .info-grid {{
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 12px;
-      margin-top: 18px;
+      margin: 16px 0;
     }}
-    .stat, section, .module {{
-      background: var(--paper);
+    .info, .mini-card {{
       border: 1px solid var(--line);
       border-radius: 8px;
-    }}
-    .stat {{
-      padding: 12px 14px;
+      padding: 12px;
+      background: #fbfcfe;
     }}
     .label, dt {{
       color: var(--muted);
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 800;
       text-transform: uppercase;
     }}
     .value, dd {{
       margin: 4px 0 0;
       font-weight: 650;
     }}
-    section {{
-      padding: 20px;
-      margin: 16px 0;
+    .tagline {{
+      font-size: 21px;
+      max-width: 780px;
+      margin: 10px 0 16px;
+      font-weight: 680;
     }}
-    .pedagogy-grid {{
+    .section-grid {{
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px 18px;
+      gap: 14px;
     }}
-    .module-list {{
-      display: grid;
-      gap: 12px;
+    .full-width {{
+      grid-column: 1 / -1;
     }}
-    .module {{
-      padding: 16px;
-    }}
-    .module-head {{
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 8px;
-    }}
-    .module-id {{
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 28px;
-      border-radius: 6px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-weight: 800;
-      font-size: 13px;
-      flex: 0 0 auto;
-    }}
-    .objective {{
-      margin: 0 0 14px;
-    }}
-    .module-meta {{
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-      margin: 0 0 12px;
+    ul, ol {{
+      margin: 8px 0 0;
+      padding-left: 22px;
     }}
     .chips {{
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+      margin-top: 10px;
     }}
     .chip {{
       border: 1px solid var(--line);
       border-radius: 999px;
       padding: 4px 9px;
-      background: #fafcff;
+      background: #ffffff;
       font-size: 13px;
     }}
-    .note {{
-      border-left: 4px solid var(--warn);
-      background: var(--warn-soft);
-      padding: 12px 14px;
+    .phase {{
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      background: #fbfcfe;
+      margin: 12px 0;
+    }}
+    .phase-head {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }}
+    .phase-head span, .module-id {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       border-radius: 6px;
-      margin: 0;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 800;
+      flex: 0 0 auto;
+    }}
+    .phase-head span {{
+      min-width: 38px;
+      height: 28px;
+      font-size: 12px;
+    }}
+    .module-list {{
+      display: grid;
+      gap: 10px;
+    }}
+    .module {{
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      padding: 14px;
+    }}
+    .module-head {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }}
+    .module-id {{
+      width: 36px;
+      height: 28px;
+      font-size: 13px;
+    }}
+    .module p {{
+      margin: 0 0 12px;
+    }}
+    .module-meta {{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 0 0 10px;
+    }}
+    .note {{
+      border-left: 4px solid var(--gold);
+      background: var(--gold-soft);
+      border-radius: 6px;
+      padding: 12px 14px;
     }}
     table {{
       width: 100%;
@@ -246,7 +400,7 @@ def render_course_spec_html(spec: CourseSpec) -> str:
     }}
     th, td {{
       border-bottom: 1px solid var(--line);
-      padding: 10px 8px;
+      padding: 9px 8px;
       text-align: left;
       vertical-align: top;
     }}
@@ -260,7 +414,7 @@ def render_course_spec_html(spec: CourseSpec) -> str:
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 16px 20px;
-      margin-top: 16px;
+      margin-top: 18px;
     }}
     summary {{
       cursor: pointer;
@@ -277,114 +431,158 @@ def render_course_spec_html(spec: CourseSpec) -> str:
     .muted {{
       color: var(--muted);
     }}
-    ul {{
-      margin: 6px 0 0;
-      padding-left: 18px;
-    }}
-    @media (max-width: 760px) {{
-      main {{ padding: 22px 14px 36px; }}
-      h1 {{ font-size: 28px; }}
-      .summary, .pedagogy-grid, .module-meta {{
+    @media (max-width: 820px) {{
+      main {{ padding: 20px 14px 36px; }}
+      h1 {{ font-size: 29px; }}
+      .topbar, .section-grid {{
+        display: block;
+      }}
+      .info-grid, .module-meta {{
         grid-template-columns: 1fr;
+      }}
+      .mini-card {{
+        margin-bottom: 12px;
       }}
     }}
   </style>
 </head>
 <body>
   <main>
-    <header>
-      <div class="eyebrow">LectMate Agent A Course Review</div>
-      <h1>{escape(spec.topic)}</h1>
-      <p class="muted">
-        {escape(spec.subject.value)} for {escape(spec.age_bracket.value)}
-      </p>
-      <div class="summary">
-        <div class="stat">
-          <div class="label">Course ID</div>
-          <div class="value">{escape(spec.course_id)}</div>
-        </div>
-        <div class="stat">
-          <div class="label">Modules</div>
-          <div class="value">{len(spec.modules)}</div>
-        </div>
-        <div class="stat">
-          <div class="label">Tier</div>
-          <div class="value">T{ped.tier}</div>
-        </div>
-        <div class="stat">
-          <div class="label">Schema</div>
-          <div class="value">{escape(spec.schema_version)}</div>
-        </div>
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">LectMate Agent A Course Pages</div>
+        <h1>{escape(spec.topic)}</h1>
+        <p class="muted">
+          Stream: {escape(spec.subject.value)} · Ages {escape(_age_group(spec))} · {escape(_level(spec))}
+        </p>
       </div>
-    </header>
+      <div class="info">
+        <div class="label">Schema</div>
+        <div class="value">{escape(spec.schema_version)}</div>
+      </div>
+    </div>
 
-    <section>
-      <h2>Course Modules</h2>
-      <div class="module-list">
-        {_module_rows(spec)}
+    <section class="page" id="level-a">
+      <span class="page-label">Level A - Landing Page Card</span>
+      <h2>Landing Card</h2>
+      <div class="landing-card">
+        <h3>{escape(spec.topic)}</h3>
+        <div class="info-grid">
+          <div>
+            <div class="label">Level</div>
+            <div class="value">{escape(_level(spec))}</div>
+          </div>
+          <div>
+            <div class="label">Age Group</div>
+            <div class="value">{escape(_age_group(spec))}</div>
+          </div>
+          <div>
+            <div class="label">Lesson Range</div>
+            <div class="value">{escape(_lesson_range(spec))}</div>
+          </div>
+          <div>
+            <div class="label">Modules</div>
+            <div class="value">{len(spec.modules)}</div>
+          </div>
+        </div>
+        <p>{escape(_description(spec))}</p>
+        <div class="chips">{_chips(_skill_tags(spec))}</div>
       </div>
     </section>
 
-    <section>
+    <section class="page" id="level-b">
+      <span class="page-label">Level B - Course Overview Page (Pre-Login)</span>
+      <h2>Course Overview</h2>
+      <p class="tagline">
+        {escape(overview.tagline or _description(spec))}
+      </p>
+      <div class="info-grid">
+        <div class="info">
+          <div class="label">Course Title</div>
+          <div class="value">{escape(spec.topic)}</div>
+        </div>
+        <div class="info">
+          <div class="label">Level</div>
+          <div class="value">{escape(_level(spec))}</div>
+        </div>
+        <div class="info">
+          <div class="label">Age Group</div>
+          <div class="value">{escape(_age_group(spec))}</div>
+        </div>
+        <div class="info">
+          <div class="label">Duration</div>
+          <div class="value">{escape(_duration(spec))}</div>
+        </div>
+      </div>
+      <div class="section-grid">
+        <div class="mini-card">
+          <h3>What You Will Learn</h3>
+          <ul>{_items(learn_items)}</ul>
+        </div>
+        <div class="mini-card">
+          <h3>What You Will Build</h3>
+          <p>{escape(overview.what_you_will_build or "A final project that demonstrates the course concepts.")}</p>
+        </div>
+        <div class="mini-card full-width">
+          <h3>Why This Course</h3>
+          <p>{escape(overview.why_this_course or spec.relevancy_note or "This course builds useful foundations through structured practice.")}</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="level-c">
+      <span class="page-label">Level C - Full Course Page (Post-Login)</span>
+      <h2>Full Course Journey</h2>
+      {_phase_sections(spec)}
+
+      <div class="section-grid">
+        <div class="mini-card">
+          <h3>Learning Outcomes</h3>
+          <ol>{_items(outcomes)}</ol>
+        </div>
+        <div class="mini-card">
+          <h3>Tools You Will Use</h3>
+          <ul>{_items(overview.tools_you_will_use)}</ul>
+        </div>
+        <div class="mini-card">
+          <h3>Prerequisites & Entry Requirements</h3>
+          <ul>{_items(overview.prerequisites)}</ul>
+        </div>
+        <div class="mini-card">
+          <h3>Progress & Module Tracking</h3>
+          <ul>{_items(overview.progress_tracking)}</ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="page">
       <h2>Pedagogy Constraints</h2>
-      <div class="pedagogy-grid">
-        <div>
+      <div class="section-grid">
+        <div class="mini-card">
           <div class="label">Cognitive Theory</div>
           <div class="value">{escape(ped.cognitive_theory)}</div>
         </div>
-        <div>
+        <div class="mini-card">
           <div class="label">CSTA Level</div>
           <div class="value">{escape(ped.csta_level)}</div>
         </div>
-        <div>
-          <div class="label">Raw Text Code</div>
-          <div class="value">{escape(ped.raw_text_code_allowed)}</div>
-        </div>
-        <div>
+        <div class="mini-card">
           <div class="label">Content Format</div>
           <div class="value">{escape(ped.content_format)}</div>
         </div>
-        <div>
-          <div class="label">Metaphor / Story</div>
-          <div class="value">{escape(ped.metaphor_story)}</div>
-        </div>
-        <div>
-          <div class="label">Max Session</div>
-          <div class="value">{ped.max_session_min} min</div>
-        </div>
-        <div>
-          <div class="label">Tester Mode</div>
-          <div class="value">{escape(ped.tester_mode)}</div>
-        </div>
-        <div>
-          <div class="label">Tutor Guide</div>
-          <div class="value">{escape(ped.tutor_guide_style)}</div>
-        </div>
-        <div>
-          <div class="label">Feedback Style</div>
-          <div class="value">{escape(ped.feedback_style)}</div>
-        </div>
-        <div>
+        <div class="mini-card">
           <div class="label">Mini Project</div>
           <div class="value">{escape(ped.mini_project_type)}</div>
-        </div>
-        <div>
-          <div class="label">Exercise Types</div>
-          <ul>{_items(ped.exercise_types)}</ul>
-        </div>
-        <div>
-          <div class="label">Key CSTA Standards</div>
-          <ul>{_items(ped.key_csta_standards)}</ul>
         </div>
       </div>
     </section>
 
-    <section>
+    <section class="page">
       <h2>Relevancy Note</h2>
       <p class="note">{escape(spec.relevancy_note or "No relevancy note provided.")}</p>
     </section>
 
-    <section>
+    <section class="page">
       <h2>References</h2>
       {_reference_rows(spec)}
     </section>

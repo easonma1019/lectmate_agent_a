@@ -17,7 +17,7 @@ CourseRequest
    └─ Stage 3  Rule validation (Pydantic schema + concept graph + tier caps);
                one automatic repair round on failure
    ▼
-CourseSpec (JSON, schema v0.2.0)
+CourseSpec (JSON, schema v0.3.0)
 ```
 
 Design decisions traceable to project docs:
@@ -54,9 +54,19 @@ python -m pytest tests/ -q
 ```
 
 `--out` keeps the machine-readable CourseSpec JSON for Agent B/C handoff.
-`--html` writes a self-contained review page with the course outline,
-pedagogy constraints, references, relevancy note, and a collapsible raw JSON
-section.
+`--html` writes a self-contained review page using the three-level product
+information pattern:
+
+- Level A: landing page card with course name, level, age group, lesson range,
+  one-sentence description, and skill tags
+- Level B: pre-login overview with tagline, learning bullets, build outcome,
+  and course rationale
+- Level C: post-login full course page with phases, modules, learning outcomes,
+  tools, prerequisites, and progress tracking
+
+The LLM path now produces `overview` and `phases` fields in addition to the
+machine-readable module list, references, pedagogy constraints, and relevancy
+note. Stub mode generates deterministic display data for local demos.
 
 Python usage:
 

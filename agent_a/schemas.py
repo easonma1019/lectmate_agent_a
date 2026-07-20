@@ -130,6 +130,37 @@ class ModuleSpec(BaseModel):
         return v
 
 
+class CourseOverview(BaseModel):
+    """Human-facing course copy used by Level A/B/C display surfaces.
+
+    These fields do not replace the machine handoff contract. They give
+    product pages enough structured copy to render landing, pre-login, and
+    full course views without asking the frontend to invent curriculum text.
+    """
+
+    level: str = Field(default="", description="e.g. Beginner | Intermediate")
+    lesson_range: str = Field(default="", description="e.g. 20-24 lessons")
+    duration: str = Field(default="", description="e.g. 10-12 weeks")
+    tagline: str = Field(default="")
+    one_sentence_description: str = Field(default="")
+    skill_tags: list[str] = Field(default_factory=list)
+    what_you_will_learn: list[str] = Field(default_factory=list)
+    what_you_will_build: str = Field(default="")
+    why_this_course: str = Field(default="")
+    learning_outcomes: list[str] = Field(default_factory=list)
+    tools_you_will_use: list[str] = Field(default_factory=list)
+    prerequisites: list[str] = Field(default_factory=list)
+    progress_tracking: list[str] = Field(default_factory=list)
+
+
+class CoursePhase(BaseModel):
+    """A product-facing grouping of modules for the full course page."""
+
+    phase_id: str = Field(..., pattern=r"^p\d+$")
+    title: str
+    module_ids: list[str] = Field(..., min_length=1)
+
+
 class CourseSpec(BaseModel):
     """Agent A -> Agent B handoff object (Game Plan §4.1, extended)."""
 
@@ -144,7 +175,9 @@ class CourseSpec(BaseModel):
     )
     references: list[Reference] = Field(default_factory=list)
     modules: list[ModuleSpec] = Field(..., min_length=1)
-    schema_version: str = "0.2.0"
+    overview: CourseOverview = Field(default_factory=CourseOverview)
+    phases: list[CoursePhase] = Field(default_factory=list)
+    schema_version: str = "0.3.0"
 
     @model_validator(mode="after")
     def validate_prerequisite_graph(self) -> "CourseSpec":
@@ -175,4 +208,31 @@ class CourseSpec(BaseModel):
                     f"{m.module_id}: target_minutes={m.target_minutes} exceeds the "
                     f"tier-{self.pedagogy.tier} hard cap of {cap} min (T03 matrix)"
                 )
+        return self
+
+    @model_validator(mode="after")
+    def validate_phases(self) -> "CourseSpec":
+        if not self.phases:
+            return self
+
+        module_ids = {m.module_id for m in self.modules}
+        assigned: list[str] = []
+        for phase in self.phases:
+            for module_id in phase.module_ids:
+                if module_id not in module_ids:
+                    raise ValueError(
+                        f"{phase.phase_id} lists unknown module_id '{module_id}'"
+                    )
+                assigned.append(module_id)
+
+        if len(assigned) != len(set(assigned)):
+            raise ValueError("duplicate module_id across phases")
+
+        if set(assigned) != module_ids:
+            missing = sorted(module_ids - set(assigned))
+            raise ValueError(
+                "phases must cover every module exactly once"
+                + (f"; missing: {missing}" if missing else "")
+            )
+
         return self

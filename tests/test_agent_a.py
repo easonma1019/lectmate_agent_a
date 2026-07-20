@@ -10,7 +10,7 @@ from agent_a import AgeBracket, CourseRequest, Subject, plan_course, rule_check
 from agent_a.concept_graph import toposort_check
 from agent_a.html_report import render_course_spec_html, write_course_spec_html
 from agent_a.pedagogy import lookup
-from agent_a.schemas import CourseSpec, ModuleSpec
+from agent_a.schemas import CoursePhase, CourseSpec, ModuleSpec
 
 
 def _req(age=AgeBracket.CREATORS, **kw):
@@ -51,9 +51,13 @@ def test_html_report_renders_course_review_page(tmp_path):
     spec = plan_course(_req(max_modules=2), use_llm=False)
 
     html = render_course_spec_html(spec)
-    assert "LectMate Agent A Course Review" in html
+    assert "LectMate Agent A Course Pages" in html
+    assert "Level A - Landing Page Card" in html
+    assert "Level B - Course Overview Page (Pre-Login)" in html
+    assert "Level C - Full Course Page (Post-Login)" in html
     assert "Python fundamentals" in html
     assert spec.modules[0].title in html
+    assert spec.phases[0].title in html
     assert "Raw CourseSpec JSON" in html
 
     output_path = write_course_spec_html(spec, tmp_path / "review.html")
@@ -95,6 +99,28 @@ def test_over_cap_minutes_rejected():
     ]
     with pytest.raises(ValidationError, match="hard cap"):
         CourseSpec(**_minimal_spec(mods))
+
+
+def test_phase_must_cover_each_module_once():
+    mods = [
+        ModuleSpec(module_id="m1", title="a", objective="Understand x",
+                   prerequisites=[], target_minutes=30,
+                   exercise_type="fill_in_the_blank"),
+        ModuleSpec(module_id="m2", title="b", objective="Understand y",
+                   prerequisites=["m1"], target_minutes=30,
+                   exercise_type="fill_in_the_blank"),
+    ]
+    with pytest.raises(ValidationError, match="cover every module"):
+        CourseSpec(
+            **_minimal_spec(mods),
+            phases=[
+                CoursePhase(
+                    phase_id="p1",
+                    title="Only the first module",
+                    module_ids=["m1"],
+                )
+            ],
+        )
 
 
 def test_compound_objective_rejected():

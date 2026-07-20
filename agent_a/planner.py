@@ -34,6 +34,8 @@ from openai import OpenAI
 from . import pedagogy
 from .concept_graph import PYTHON_CONCEPTS, toposort_check
 from .schemas import (
+    CourseOverview,
+    CoursePhase,
     CourseRequest,
     CourseSpec,
     ModuleSpec,
@@ -184,6 +186,54 @@ def _stage2_prompt(
             - "csta_alignment": 1-2 CSTA standard codes from
             {ped.key_csta_standards}
 
+            Also produce product-page display data based on this three-level
+            course information model:
+
+            Level A - Landing Page Card:
+            - "course name"
+            - "level"
+            - "age group"
+            - "lesson range"
+            - "one-sentence description"
+            - "skill tags"
+
+            Level B - Course Overview Page (pre-login):
+            - all Level A fields
+            - "tagline"
+            - "duration"
+            - "what_you_will_learn": 5-7 learner-facing bullets
+            - "what_you_will_build": one short paragraph describing the final
+              artifact or portfolio output
+            - "why_this_course": one short paragraph on relevance and value
+
+            Level C - Full Course Page (post-login):
+            - all Level B fields
+            - "phases": 3-5 phase objects grouping every module exactly once
+              in order. Each phase has:
+              {{"phase_id": "p1", "title": "...", "module_ids": ["m1", ...]}}
+            - "learning_outcomes": 6-10 assessable end-of-course outcomes
+            - "tools_you_will_use": practical tools, platforms, languages,
+              libraries, datasets, or materials used in the course
+            - "prerequisites": entry requirements for the learner
+            - "progress_tracking": bullets describing module/session tracking
+
+            The overview must be an object with exactly these keys:
+            {{
+              "level": "...",
+              "lesson_range": "...",
+              "duration": "...",
+              "tagline": "...",
+              "one_sentence_description": "...",
+              "skill_tags": ["...", "..."],
+              "what_you_will_learn": ["...", "..."],
+              "what_you_will_build": "...",
+              "why_this_course": "...",
+              "learning_outcomes": ["...", "..."],
+              "tools_you_will_use": ["...", "..."],
+              "prerequisites": ["...", "..."],
+              "progress_tracking": ["...", "..."]
+            }}
+
             Also produce:
             - "relevancy_note": 2-3 sentences on whether "{req.topic}" is current
             and worth teaching in 2026 for this age bracket, noting anything
@@ -200,7 +250,13 @@ def _stage2_prompt(
             - "paper"
 
             Respond with ONLY a JSON object, no prose, no markdown fences:
-            {{"relevancy_note": "...", "references": [...], "modules": [...]}}"""
+            {{
+              "overview": {{...}},
+              "phases": [...],
+              "relevancy_note": "...",
+              "references": [...],
+              "modules": [...]
+            }}"""
 
 
 # ---------------------------------------------------------------------------
@@ -438,6 +494,107 @@ _STUB_SEQUENCE = [
 ]
 
 
+def _default_level(age_bracket) -> str:
+    if age_bracket.name in {"EXPLORERS", "CREATORS"}:
+        return "Beginner"
+    if age_bracket.name == "INNOVATORS":
+        return "Intermediate"
+    return "Advanced"
+
+
+def _stub_overview(req: CourseRequest, n_modules: int, ped) -> CourseOverview:
+    lesson_low = max(n_modules, n_modules * 2)
+    lesson_high = max(lesson_low, n_modules * 3)
+    duration_low = max(1, round(lesson_low / 2))
+    duration_high = max(duration_low + 1, round(lesson_high / 2))
+    topic = req.topic
+
+    return CourseOverview(
+        level=_default_level(req.age_bracket),
+        lesson_range=f"{lesson_low}-{lesson_high} lessons",
+        duration=f"{duration_low}-{duration_high} weeks",
+        tagline=(
+            f"Build a clear foundation in {topic} through structured, "
+            "age-appropriate projects."
+        ),
+        one_sentence_description=(
+            f"Learn the core ideas of {topic} through guided practice, "
+            "short modules, and a final applied project."
+        ),
+        skill_tags=[
+            req.subject.value,
+            topic,
+            "Problem Solving",
+        ],
+        what_you_will_learn=[
+            "Explain the core ideas behind the topic in learner-friendly language",
+            "Use each new concept in a small guided exercise",
+            "Connect modules in a clear prerequisite sequence",
+            "Apply the course tools to a practical final project",
+            "Reflect on progress using tutor feedback and checkpoints",
+        ],
+        what_you_will_build=(
+            "Learners work through a sequence of focused modules, each adding "
+            "one new capability. By the end, they complete a small portfolio "
+            f"project that demonstrates their understanding of {topic}."
+        ),
+        why_this_course=(
+            f"{topic} is a useful foundation for modern digital learning. "
+            "The course keeps the structure focused, age-aware, and paced so "
+            "learners can build confidence without being overloaded."
+        ),
+        learning_outcomes=[
+            f"Describe the purpose of {topic}",
+            "Complete guided exercises using the course concepts",
+            "Use prerequisite knowledge before attempting later modules",
+            "Explain choices made during the final project",
+            "Respond to tutor feedback with concrete improvements",
+            "Present the final project clearly",
+        ],
+        tools_you_will_use=[
+            req.subject.value,
+            "Tutor-led live sessions",
+            "Practice exercises",
+            ped.mini_project_type,
+        ],
+        prerequisites=[
+            "No advanced prior experience is required",
+            "Learners should be comfortable following step-by-step instructions",
+            "A computer and stable internet connection are recommended",
+        ],
+        progress_tracking=[
+            f"{n_modules} modules across 3 phases",
+            "Each module includes one guided exercise type",
+            "Prerequisites are tracked before each new module",
+            "The final project serves as the course portfolio checkpoint",
+        ],
+    )
+
+
+def _stub_phases(n_modules: int) -> list[CoursePhase]:
+    phase_titles = [
+        "Foundations",
+        "Core Skills",
+        "Applied Practice",
+    ]
+    phase_count = min(3, n_modules)
+    phases: list[CoursePhase] = []
+    for index in range(phase_count):
+        start = (index * n_modules) // phase_count + 1
+        end = ((index + 1) * n_modules) // phase_count
+        phases.append(
+            CoursePhase(
+                phase_id=f"p{index + 1}",
+                title=phase_titles[index],
+                module_ids=[
+                    f"m{module_index}"
+                    for module_index in range(start, end + 1)
+                ],
+            )
+        )
+    return phases
+
+
 def _stub_plan(
     req: CourseRequest,
     ped,
@@ -504,6 +661,8 @@ def _stub_plan(
             )
         ],
         modules=modules,
+        overview=_stub_overview(req, n_modules, ped),
+        phases=_stub_phases(n_modules),
     )
 
 
@@ -651,6 +810,19 @@ def plan_course(
             ModuleSpec(**module)
             for module in expanded["modules"]
         ],
+        overview=CourseOverview(
+            **expanded.get(
+                "overview",
+                {},
+            )
+        ),
+        phases=[
+            CoursePhase(**phase)
+            for phase in expanded.get(
+                "phases",
+                [],
+            )
+        ],
     )
 
     # -----------------------------------------------------------------------
@@ -700,6 +872,22 @@ def plan_course(
                     "relevancy_note",
                     spec.relevancy_note,
                 ),
+                "overview": CourseOverview(
+                    **repaired.get(
+                        "overview",
+                        spec.overview.model_dump(),
+                    )
+                ),
+                "phases": [
+                    CoursePhase(**phase)
+                    for phase in repaired.get(
+                        "phases",
+                        [
+                            phase.model_dump()
+                            for phase in spec.phases
+                        ],
+                    )
+                ],
                 "references": (
                     repaired_references
                     or spec.references
@@ -709,6 +897,9 @@ def plan_course(
                     for module in repaired["modules"]
                 ],
             }
+        )
+        spec = CourseSpec.model_validate(
+            spec.model_dump()
         )
 
         # 修复后重新检查
