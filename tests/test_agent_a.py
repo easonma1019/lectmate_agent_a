@@ -58,11 +58,33 @@ def test_html_report_renders_course_review_page(tmp_path):
     assert "Python fundamentals" in html
     assert spec.modules[0].title in html
     assert spec.phases[0].title in html
+    assert "Automation Packaging" in html
+    assert "Module 1 - Slides.pptx" in html
     assert "Raw CourseSpec JSON" in html
 
     output_path = write_course_spec_html(spec, tmp_path / "review.html")
     assert output_path.exists()
     assert output_path.as_uri().startswith("file://")
+
+
+def test_packaging_plan_derives_resource_bank_structure():
+    spec = plan_course(_req(max_modules=2), use_llm=False)
+
+    assert spec.schema_version == "0.4.0"
+    assert spec.packaging.exercises_per_module == 6
+    assert spec.packaging.quiz_questions_per_module == 10
+    assert spec.packaging.assignments_per_module == 3
+    assert spec.packaging.component_banks[2].folder_name == "Exercise Bank"
+    assert spec.packaging.component_banks[2].total_units == 12
+
+    first_package = spec.packaging.module_packages[0]
+    assert first_package.module_index == 1
+    assert first_package.module_title == spec.modules[0].title
+    assert first_package.folder_name == f"Module 1 - {spec.modules[0].title}"
+    assert first_package.slides_file == "Module 1 - Slides.pptx"
+    assert first_package.exercises_file == "Module 1 - Exercises.pptx"
+    assert first_package.questions_file == "Module 1 - Questions.pptx"
+    assert first_package.assignments_file == "Module 1 - Assignments.pptx"
 
 
 # --- schema guards ----------------------------------------------------------

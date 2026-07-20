@@ -176,6 +176,9 @@ def _stage2_prompt(
             For each module produce:
             - "module_id": "m1", "m2", ... in order
             - "title": from the outline (you may polish wording)
+            The module index and final title become the automation join key
+            across Course Slides, Exercise Bank, Quiz Bank, and Assignment Bank,
+            so keep titles stable, concise, and free of trailing sub-descriptions.
             - "objective": EXACTLY ONE clear, assessable learning objective
             (one verb, one outcome; no "and" joining two skills; no semicolons)
             - "prerequisites": list only the direct earlier module_ids this module 

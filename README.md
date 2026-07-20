@@ -17,7 +17,7 @@ CourseRequest
    └─ Stage 3  Rule validation (Pydantic schema + concept graph + tier caps);
                one automatic repair round on failure
    ▼
-CourseSpec (JSON, schema v0.3.0)
+CourseSpec (JSON, schema v0.4.0)
 ```
 
 Design decisions traceable to project docs:
@@ -68,6 +68,12 @@ The LLM path now produces `overview` and `phases` fields in addition to the
 machine-readable module list, references, pedagogy constraints, and relevancy
 note. Stub mode generates deterministic display data for local demos.
 
+The schema also derives a `packaging` block from the module list. This captures
+the automation contract from `Course_Component_Structure.docx`: Course Slides,
+Exercise Bank, Quiz Bank, Assignment Bank, and Additional resources; per-module
+folder names; split file names; 6 exercises, 10 quiz questions, and 3
+assignments per module; cross-bank relationships; and validation checks.
+
 Python usage:
 
 ```python
@@ -86,6 +92,9 @@ Added fields — raise with B & C owners and log in the shared changelog:
 - `relevancy_note` (str) — topic-currency check result
 - `references` (list) — grounding sources for Agent C to verify against
 - per-module: `title`, `exercise_type`, `csta_alignment`
+- `overview` and `phases` — Level A/B/C page data for product display
+- `packaging` — resource-bank, split-file, and validation metadata derived from
+  the module list
 - `schema_version` — for changelog tracking
 
 ## Known gaps / next steps

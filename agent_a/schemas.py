@@ -161,6 +161,157 @@ class CoursePhase(BaseModel):
     module_ids: list[str] = Field(..., min_length=1)
 
 
+class ComponentBankSpec(BaseModel):
+    """One master resource bank and how it is split by module."""
+
+    folder_name: str
+    master_file: str
+    per_module_unit: str
+    units_per_module: Optional[int] = None
+    total_units: Optional[int] = None
+    split_file_name: str
+    split_by_module: bool = True
+
+
+class ModulePackageSpec(BaseModel):
+    """The exact per-module join key and split-file names across banks."""
+
+    module_id: str
+    module_index: int
+    module_title: str
+    folder_title: str
+    folder_name: str
+    slides_file: str
+    exercises_file: str
+    questions_file: str
+    assignments_file: str
+
+
+class CoursePackagingPlan(BaseModel):
+    """Automation contract for course banks, folders, and split outputs."""
+
+    bank_folders: list[str] = Field(default_factory=list)
+    component_banks: list[ComponentBankSpec] = Field(default_factory=list)
+    module_packages: list[ModulePackageSpec] = Field(default_factory=list)
+    relationships: list[str] = Field(default_factory=list)
+    validation_checklist: list[str] = Field(default_factory=list)
+    exercises_per_module: int = 6
+    quiz_questions_per_module: int = 10
+    assignments_per_module: int = 3
+
+
+def _folder_title(module_title: str) -> str:
+    title = module_title.strip()
+    for separator in (" — ", " – ", " - "):
+        if separator in title:
+            title = title.split(separator, 1)[0].strip()
+            break
+    return title or module_title.strip()
+
+
+def _build_packaging_plan(
+    topic: str,
+    modules: list[ModuleSpec],
+) -> CoursePackagingPlan:
+    module_count = len(modules)
+    module_packages = []
+
+    for index, module in enumerate(modules, start=1):
+        folder_title = _folder_title(module.title)
+        module_packages.append(
+            ModulePackageSpec(
+                module_id=module.module_id,
+                module_index=index,
+                module_title=module.title,
+                folder_title=folder_title,
+                folder_name=f"Module {index} - {folder_title}",
+                slides_file=f"Module {index} - Slides.pptx",
+                exercises_file=f"Module {index} - Exercises.pptx",
+                questions_file=f"Module {index} - Questions.pptx",
+                assignments_file=f"Module {index} - Assignments.pptx",
+            )
+        )
+
+    return CoursePackagingPlan(
+        bank_folders=[
+            "Course Slides",
+            "Exercise Bank",
+            "Quiz Bank",
+            "Assignment Bank",
+            "Additional resources",
+        ],
+        component_banks=[
+            ComponentBankSpec(
+                folder_name="Specification",
+                master_file=f"{topic} Three Level Information.pdf",
+                per_module_unit="source module list",
+                units_per_module=None,
+                total_units=1,
+                split_file_name="not split",
+                split_by_module=False,
+            ),
+            ComponentBankSpec(
+                folder_name="Course Slides",
+                master_file=f"{topic}_Slides.pptx",
+                per_module_unit="concept slides + practise handoff",
+                units_per_module=None,
+                total_units=None,
+                split_file_name="Module N - Slides.pptx",
+            ),
+            ComponentBankSpec(
+                folder_name="Exercise Bank",
+                master_file=f"{topic} Exercises bank.pptx",
+                per_module_unit="exercise slides",
+                units_per_module=6,
+                total_units=module_count * 6,
+                split_file_name="Module N - Exercises.pptx",
+            ),
+            ComponentBankSpec(
+                folder_name="Quiz Bank",
+                master_file=f"{topic} Questions bank.pptx",
+                per_module_unit="question and answer slide pairs",
+                units_per_module=10,
+                total_units=module_count * 10,
+                split_file_name="Module N - Questions.pptx",
+            ),
+            ComponentBankSpec(
+                folder_name="Assignment Bank",
+                master_file="Assignments.pptx",
+                per_module_unit="assignment slides",
+                units_per_module=3,
+                total_units=module_count * 3,
+                split_file_name="Module N - Assignments.pptx",
+            ),
+            ComponentBankSpec(
+                folder_name="Additional resources",
+                master_file="folder",
+                per_module_unit="notebooks, datasets, video, links",
+                units_per_module=None,
+                total_units=None,
+                split_file_name="not split",
+                split_by_module=False,
+            ),
+        ],
+        module_packages=module_packages,
+        relationships=[
+            "Specification module list drives Course Slides, Exercise Bank, Quiz Bank, and Assignment Bank.",
+            "Module index plus module title is the primary join key across all split outputs.",
+            "Course Slides practise handoff references the Exercise Bank and Quiz Bank for the same module.",
+            "Additional resources hold shared notebooks, datasets, videos, and links referenced by all banks.",
+        ],
+        validation_checklist=[
+            "Specification exists and lists exactly the modules used by every bank.",
+            "All four split banks contain the same Module N - <Title> subfolders.",
+            "Each module subfolder contains exactly one split file of the correct type.",
+            "Counts match the spec: 6 exercises, 10 quiz questions, and 3 assignments per module.",
+            "Course Slides handoff figures match the actual Exercise and Quiz bank counts.",
+            "Speaker notes are present on split Course Slides files.",
+            "Each split deck opens without repair and starts on its module divider.",
+            "Additional resources hold every dataset or notebook referenced by the banks.",
+        ],
+    )
+
+
 class CourseSpec(BaseModel):
     """Agent A -> Agent B handoff object (Game Plan §4.1, extended)."""
 
@@ -177,7 +328,8 @@ class CourseSpec(BaseModel):
     modules: list[ModuleSpec] = Field(..., min_length=1)
     overview: CourseOverview = Field(default_factory=CourseOverview)
     phases: list[CoursePhase] = Field(default_factory=list)
-    schema_version: str = "0.3.0"
+    packaging: CoursePackagingPlan = Field(default_factory=CoursePackagingPlan)
+    schema_version: str = "0.4.0"
 
     @model_validator(mode="after")
     def validate_prerequisite_graph(self) -> "CourseSpec":
@@ -235,4 +387,9 @@ class CourseSpec(BaseModel):
                 + (f"; missing: {missing}" if missing else "")
             )
 
+        return self
+
+    @model_validator(mode="after")
+    def derive_packaging_plan(self) -> "CourseSpec":
+        self.packaging = _build_packaging_plan(self.topic, self.modules)
         return self

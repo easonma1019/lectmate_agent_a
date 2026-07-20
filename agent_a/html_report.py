@@ -167,6 +167,53 @@ def _reference_rows(spec: CourseSpec) -> str:
     )
 
 
+def _component_bank_rows(spec: CourseSpec) -> str:
+    rows = []
+    for bank in spec.packaging.component_banks:
+        units = (
+            str(bank.units_per_module)
+            if bank.units_per_module is not None
+            else "varies"
+        )
+        total = (
+            str(bank.total_units)
+            if bank.total_units is not None
+            else "varies"
+        )
+        rows.append(
+            f"""
+            <tr>
+              <td>{escape(bank.folder_name)}</td>
+              <td>{escape(bank.master_file)}</td>
+              <td>{escape(bank.per_module_unit)}</td>
+              <td>{escape(units)}</td>
+              <td>{escape(total)}</td>
+              <td>{escape(bank.split_file_name)}</td>
+            </tr>
+            """
+        )
+    return "\n".join(rows)
+
+
+def _module_package_rows(spec: CourseSpec) -> str:
+    rows = []
+    for package in spec.packaging.module_packages:
+        rows.append(
+            f"""
+            <tr>
+              <td>{package.module_index}</td>
+              <td>{escape(package.module_title)}</td>
+              <td>{escape(package.folder_name)}</td>
+              <td>{escape(package.slides_file)}</td>
+              <td>{escape(package.exercises_file)}</td>
+              <td>{escape(package.questions_file)}</td>
+              <td>{escape(package.assignments_file)}</td>
+            </tr>
+            """
+        )
+    return "\n".join(rows)
+
+
 def render_course_spec_html(spec: CourseSpec) -> str:
     """Render Level A, B, and C course pages in one self-contained HTML file."""
 
@@ -551,6 +598,71 @@ def render_course_spec_html(spec: CourseSpec) -> str:
         <div class="mini-card">
           <h3>Progress & Module Tracking</h3>
           <ul>{_items(overview.progress_tracking)}</ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="page">
+      <h2>Automation Packaging</h2>
+      <p class="muted">
+        Module index and module title are the join key across the specification,
+        slides, exercises, quizzes, assignments, and shared resources.
+      </p>
+      <div class="section-grid">
+        <div class="mini-card">
+          <h3>Resource Banks</h3>
+          <ul>{_items(spec.packaging.bank_folders)}</ul>
+        </div>
+        <div class="mini-card">
+          <h3>Fixed Counts</h3>
+          <ul>
+            <li>{spec.packaging.exercises_per_module} exercises per module</li>
+            <li>{spec.packaging.quiz_questions_per_module} quiz questions per module</li>
+            <li>{spec.packaging.assignments_per_module} assignments per module</li>
+          </ul>
+        </div>
+      </div>
+      <h3>Component Structure</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Master</th>
+            <th>Per-module unit</th>
+            <th>Units/module</th>
+            <th>Total</th>
+            <th>Split file</th>
+          </tr>
+        </thead>
+        <tbody>
+          {_component_bank_rows(spec)}
+        </tbody>
+      </table>
+      <h3>Module Package Map</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>N</th>
+            <th>Module title</th>
+            <th>Folder</th>
+            <th>Slides</th>
+            <th>Exercises</th>
+            <th>Questions</th>
+            <th>Assignments</th>
+          </tr>
+        </thead>
+        <tbody>
+          {_module_package_rows(spec)}
+        </tbody>
+      </table>
+      <div class="section-grid">
+        <div class="mini-card">
+          <h3>Relationships</h3>
+          <ul>{_items(spec.packaging.relationships)}</ul>
+        </div>
+        <div class="mini-card">
+          <h3>Validation Checklist</h3>
+          <ul>{_items(spec.packaging.validation_checklist)}</ul>
         </div>
       </div>
     </section>
