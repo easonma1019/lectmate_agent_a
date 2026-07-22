@@ -60,6 +60,12 @@ python -m agent_a.cli --subject AI --age "Innovators (14-17)" \
 python -m agent_a.cli --subject Coding --age "Creators (10-13)" \
     --topic "Python fundamentals" --stub --out spec.json --html review.html
 
+# Revision flow: old JSON + change request -> new JSON/HTML/report
+python -m agent_a.revise --in spec.json \
+    --change "把课程改成 8 个模块，并加强项目制学习" \
+    --out spec_v2.json --html review_v2.html \
+    --report revision_report.md
+
 # Tests
 python -m pytest tests/ -q
 ```
@@ -103,13 +109,21 @@ print(spec.model_dump_json(indent=2))
 
 ## Revision workflow
 
-Today the generated `spec.json` and `review.html` are static outputs. To change
-the course structure, change the source request and regenerate:
+The generated `spec.json` and `review.html` are static outputs, but the project
+now includes a revision loop for controlled edits:
 
-- adjust `--topic`, `--age`, `--modules`, `--objective`, `--requirement`, or
-  `--mode`
-- rerun the CLI to produce a new JSON/HTML pair
-- review the new `review.html`
+1. Load the old `spec.json`
+2. Read one or more `--change` requests
+3. Ask the LLM to produce a complete revised CourseSpec JSON
+4. Run programmatic validation: schema, prerequisites, pedagogy rules, phase
+   coverage, packaging, and HTML rendering
+5. Compare old vs new modules, phases, and packaging totals
+6. Ask the LLM reviewer whether the new spec satisfies the requested change
+7. Write `spec_v2.json`, `review_v2.html`, and `revision_report.md`
+
+Use `--stub` for deterministic local testing without an API key. With
+`OPENROUTER_API_KEY` set, revision and reviewer both use the LLM unless
+`--no-llm-reviewer` is passed.
 
 Once downstream resource banks have been generated, keep module titles stable
 where possible because `Module N - <Title>` is the join key across slides,
