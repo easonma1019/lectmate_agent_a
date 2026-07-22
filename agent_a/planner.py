@@ -13,7 +13,7 @@ Two-stage, constraint-based planning (Game Plan §5 'Techniques worth trying'):
 Runs in two modes:
 
   - LLM mode:
-        OPENROUTER_API_KEY is set -> real LLM planning through OpenRouter
+        OPENAI_API_KEY is set -> real LLM planning through OpenAI
 
   - Stub mode:
         no API key -> deterministic template output, so Agents B & C can
@@ -48,70 +48,98 @@ from .schemas import (
 
 
 # ---------------------------------------------------------------------------
-# OpenRouter configuration
+# OpenAI configuration
 # ---------------------------------------------------------------------------
 
 # 读取项目目录中的 .env 文件
 load_dotenv()
 
-# 默认使用 OpenRouter 的免费模型路由器。
+# 默认使用 OpenAI 的轻量高质量模型。
 #
-# 也可以在 .env 中使用 OPENROUTER_MODEL 指定其他模型，
-# 例如：
+# 也可以在 .env 中使用 OPENAI_MODEL 指定其他模型，例如：
 #
-# OPENROUTER_MODEL='openai/gpt-oss-20b:free'
+# OPENAI_MODEL='gpt-4.1'
 #
-# 如果没有设置 OPENROUTER_MODEL，就自动使用 openrouter/free。
-OPENROUTER_MODEL = os.environ.get(
-    "OPENROUTER_MODEL",
-    "openrouter/free",
+# 如果没有设置 OPENAI_MODEL，就自动使用 gpt-4.1-mini。
+OPENAI_MODEL = os.environ.get(
+    "OPENAI_MODEL",
+    "gpt-4.1-mini",
 )
 
-# 缓存 OpenRouter 客户端。
+# 旧 OpenRouter 配置保留在这里，暂时注释掉，方便之后回退。
+# OPENROUTER_MODEL = os.environ.get(
+#     "OPENROUTER_MODEL",
+#     "openrouter/free",
+# )
+
+# 缓存 OpenAI 客户端。
 #
 # 初始值为 None，表示客户端还没有被创建。
 # 只有真正需要调用 LLM 时，程序才会创建客户端。
-_openrouter_client: OpenAI | None = None
+_openai_client: OpenAI | None = None
 
 
-def _get_openrouter_client() -> OpenAI:
-    """Create and cache an OpenRouter client.
+def has_llm_api_key() -> bool:
+    """Return whether the configured LLM provider has an API key."""
+    return bool(os.environ.get("OPENAI_API_KEY"))
+
+
+def _get_openai_client() -> OpenAI:
+    """Create and cache an OpenAI client.
 
     The client is created only when the LLM is actually used. This means
     stub mode can still run without an API key.
     """
 
-    global _openrouter_client
+    global _openai_client
 
     # 如果客户端已经创建过，直接重复使用
-    if _openrouter_client is not None:
-        return _openrouter_client
+    if _openai_client is not None:
+        return _openai_client
 
-    # 从环境变量读取 OpenRouter API Key
-    api_key = os.environ.get("OPENROUTER_API_KEY")
+    # 从环境变量读取 OpenAI API Key
+    api_key = os.environ.get("OPENAI_API_KEY")
 
     # use_llm=True 但没有配置密钥时，给出清晰错误
     if api_key is None:
         raise RuntimeError(
-            "未读取到 OPENROUTER_API_KEY。"
+            "未读取到 OPENAI_API_KEY。"
             "请检查项目目录中的 .env 文件配置。"
         )
 
     # 防止用户把空字符串配置成 API Key
     if not api_key.strip():
         raise RuntimeError(
-            "OPENROUTER_API_KEY 是空字符串，"
+            "OPENAI_API_KEY 是空字符串，"
             "请检查项目目录中的 .env 文件配置。"
         )
 
-    # OpenRouter 与 OpenAI API 兼容，
-    # 因此可以使用 OpenAI 官方 Python SDK
-    _openrouter_client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
+    _openai_client = OpenAI(
         api_key=api_key,
     )
 
-    return _openrouter_client
+    return _openai_client
+
+
+# 旧 OpenRouter 客户端代码保留在这里，暂时注释掉，方便之后回退。
+# _openrouter_client: OpenAI | None = None
+#
+#
+# def _get_openrouter_client() -> OpenAI:
+#     """Create and cache an OpenRouter client."""
+#     global _openrouter_client
+#     if _openrouter_client is not None:
+#         return _openrouter_client
+#     api_key = os.environ.get("OPENROUTER_API_KEY")
+#     if api_key is None:
+#         raise RuntimeError("未读取到 OPENROUTER_API_KEY。请检查项目目录中的 .env 文件配置。")
+#     if not api_key.strip():
+#         raise RuntimeError("OPENROUTER_API_KEY 是空字符串，请检查项目目录中的 .env 文件配置。")
+#     _openrouter_client = OpenAI(
+#         base_url="https://openrouter.ai/api/v1",
+#         api_key=api_key,
+#     )
+#     return _openrouter_client
 
 
 # ---------------------------------------------------------------------------
@@ -333,17 +361,13 @@ def _stage2_prompt(
 # ---------------------------------------------------------------------------
 
 def _call_llm(prompt: str) -> str:
-    """Send a prompt to an LLM through OpenRouter.
+    """Send a prompt to an LLM through OpenAI."""
 
-    By default, OpenRouter automatically selects an available free model
-    because OPENROUTER_MODEL defaults to "openrouter/free".
-    """
-
-    client = _get_openrouter_client()
+    client = _get_openai_client()
 
     try:
         response = client.chat.completions.create(
-            model=OPENROUTER_MODEL,
+            model=OPENAI_MODEL,
             messages=[
                 {
                     "role": "system",
@@ -366,15 +390,23 @@ def _call_llm(prompt: str) -> str:
             max_tokens=4000,
         )
 
+        # 旧 OpenRouter 调用保留在这里，暂时注释掉，方便之后回退。
+        # response = _get_openrouter_client().chat.completions.create(
+        #     model=OPENROUTER_MODEL,
+        #     messages=[...],
+        #     temperature=0.2,
+        #     max_tokens=4000,
+        # )
+
     except Exception as exc:
         raise RuntimeError(
-            f"OpenRouter API 请求失败：{exc}"
+            f"OpenAI API 请求失败：{exc}"
         ) from exc
 
     # 正常响应至少应该有一个 choice
     if not response.choices:
         raise RuntimeError(
-            "OpenRouter API 未返回任何候选回答。"
+            "OpenAI API 未返回任何候选回答。"
         )
 
     content = response.choices[0].message.content
@@ -382,7 +414,7 @@ def _call_llm(prompt: str) -> str:
     # 某些异常请求可能返回空内容
     if content is None or not content.strip():
         raise RuntimeError(
-            "OpenRouter API 返回了空内容。"
+            "OpenAI API 返回了空内容。"
         )
 
     return content
@@ -458,7 +490,7 @@ def _parse_json(text: str):
 
         except json.JSONDecodeError as second_error:
             raise ValueError(
-                "OpenRouter returned content that could not be parsed "
+                "OpenAI returned content that could not be parsed "
                 "as valid JSON.\n"
                 f"Response preview: {text[:500]}"
             ) from second_error
@@ -823,14 +855,14 @@ def plan_course(
 
         use_llm:
             None:
-                Automatically use OpenRouter when OPENROUTER_API_KEY exists.
+                Automatically use OpenAI when OPENAI_API_KEY exists.
                 Otherwise use the local stub planner.
 
             False:
                 Always use the local stub planner.
 
             True:
-                Always use OpenRouter. A RuntimeError is raised if the
+                Always use OpenAI. A RuntimeError is raised if the
                 API key is unavailable.
 
     Returns:
@@ -856,9 +888,7 @@ def plan_course(
 
     # use_llm=None 表示自动检测
     if use_llm is None:
-        use_llm = bool(
-            os.environ.get("OPENROUTER_API_KEY")
-        )
+        use_llm = has_llm_api_key()
 
     # 不使用 LLM 时直接返回本地 stub
     if not use_llm:

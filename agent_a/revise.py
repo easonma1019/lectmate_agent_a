@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
+from .planner import has_llm_api_key
 from .reviser import (
     load_course_spec,
     revise_course_spec,
@@ -53,9 +53,9 @@ def main() -> int:
     change_request = "\n".join(args.change)
     old_spec = load_course_spec(args.input_path)
     use_llm = not args.stub
-    if use_llm and not os.environ.get("OPENROUTER_API_KEY"):
+    if use_llm and not has_llm_api_key():
         print(
-            "OPENROUTER_API_KEY is not set; falling back to --stub revision.",
+            "OPENAI_API_KEY is not set; falling back to --stub revision.",
             file=sys.stderr,
         )
         use_llm = False
@@ -63,7 +63,7 @@ def main() -> int:
     use_llm_reviewer = (
         use_llm
         and not args.no_llm_reviewer
-        and bool(os.environ.get("OPENROUTER_API_KEY"))
+        and has_llm_api_key()
     )
 
     result = revise_course_spec(

@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 
 from .intake import IntakeResult, render_intake_summary, run_intake, write_intake_request
+from .planner import has_llm_api_key
 
 
 def _print_turn_feedback(result: IntakeResult) -> None:
@@ -90,9 +90,9 @@ def main() -> int:
     args = parser.parse_args()
 
     use_llm = not args.stub
-    if use_llm and not os.environ.get("OPENROUTER_API_KEY"):
+    if use_llm and not has_llm_api_key():
         print(
-            "OPENROUTER_API_KEY is not set; falling back to --stub intake.",
+            "OPENAI_API_KEY is not set; falling back to --stub intake.",
             file=sys.stderr,
         )
         use_llm = False

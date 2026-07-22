@@ -41,7 +41,9 @@ python -m agent_a.cli --subject Coding --age "Creators (10-13)" \
     --topic "Python fundamentals" --stub
 
 # LLM mode (real planning)
-export OPENROUTER_API_KEY=sk-or-...
+export OPENAI_API_KEY=sk-...
+# Optional: choose a different OpenAI model
+export OPENAI_MODEL=gpt-4.1-mini
 python -m agent_a.cli --subject Coding --age "Creators (10-13)" \
     --topic "Python fundamentals" --out spec.json
 
@@ -78,6 +80,17 @@ python -m agent_a.revise --in spec.json \
 # Tests
 python -m pytest tests/ -q
 ```
+
+### Local `.env`
+
+Create or update the local `.env` file in the project root:
+
+```bash
+OPENAI_API_KEY=sk-your-openai-api-key
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+The `.env` file is ignored by Git, so local API keys should not be committed.
 
 `--out` keeps the machine-readable CourseSpec JSON for Agent B/C handoff.
 `--html` writes a self-contained review page using the three-level product
@@ -131,7 +144,7 @@ now includes a revision loop for controlled edits:
 7. Write `spec_v2.json`, `review_v2.html`, and `revision_report.md`
 
 Use `--stub` for deterministic local testing without an API key. With
-`OPENROUTER_API_KEY` set, revision and reviewer both use the LLM unless
+`OPENAI_API_KEY` set, revision and reviewer both use the LLM unless
 `--no-llm-reviewer` is passed.
 
 Once downstream resource banks have been generated, keep module titles stable
@@ -150,7 +163,7 @@ generate the course directly. It turns a conversation into a confirmed
 3. Write `course_request.json` once the request is ready
 4. Pass that request into `agent_a.cli` for fixed/addie generation
 
-Use `--stub` for deterministic local extraction. With `OPENROUTER_API_KEY` set,
+Use `--stub` for deterministic local extraction. With `OPENAI_API_KEY` set,
 the intake chatbot can use the LLM to summarize messier conversations.
 
 ## Schema changes vs Game Plan §4.1 (⚠ needs team sign-off)
