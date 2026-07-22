@@ -81,6 +81,13 @@ class CourseRequest(BaseModel):
             raise ValueError("topic must not be blank")
         return v
 
+    @field_validator("learning_objectives", "design_requirements", mode="before")
+    @classmethod
+    def none_lists_to_empty(cls, v: object) -> object:
+        if v is None:
+            return []
+        return v
+
 
 # ---------------------------------------------------------------------------
 # Pedagogy constraints (from the T03 Content Design Matrix)

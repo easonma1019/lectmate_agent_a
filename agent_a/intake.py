@@ -225,16 +225,18 @@ def _parse_intake_payload(payload: dict) -> IntakeResult:
         if isinstance(request_payload, dict)
         else None
     )
+    missing_fields = payload.get("missing_fields") or []
+    follow_up_questions = payload.get("follow_up_questions") or []
     return IntakeResult(
         request=request,
         summary=str(payload.get("summary", "")),
         missing_fields=[
             str(item)
-            for item in payload.get("missing_fields", [])
+            for item in missing_fields
         ],
         follow_up_questions=[
             str(item)
-            for item in payload.get("follow_up_questions", [])
+            for item in follow_up_questions
         ],
         confidence=str(payload.get("confidence", "low")),
     )

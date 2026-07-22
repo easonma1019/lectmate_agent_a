@@ -1,5 +1,5 @@
 from agent_a import AgeBracket, PlanningMode, Subject
-from agent_a.intake import run_intake, write_intake_request
+from agent_a.intake import _parse_intake_payload, run_intake, write_intake_request
 
 
 def test_intake_asks_follow_up_when_required_fields_missing():
@@ -32,3 +32,31 @@ def test_intake_builds_course_request(tmp_path):
 
     output_path = write_intake_request(result, tmp_path / "course_request.json")
     assert output_path.exists()
+
+
+def test_intake_parser_accepts_null_optional_lists():
+    result = _parse_intake_payload(
+        {
+            "summary": "Python course for a 9-year-old learner.",
+            "missing_fields": None,
+            "follow_up_questions": None,
+            "confidence": "medium",
+            "course_request": {
+                "subject": "Coding",
+                "age_bracket": "Explorers (6-9)",
+                "topic": "Python fundamentals",
+                "learning_objectives": None,
+                "design_requirements": None,
+                "max_modules": None,
+                "planning_mode": "fixed",
+                "source": "intake_chatbot",
+            },
+        }
+    )
+
+    assert result.ready
+    assert result.request is not None
+    assert result.request.learning_objectives == []
+    assert result.request.design_requirements == []
+    assert result.missing_fields == []
+    assert result.follow_up_questions == []
