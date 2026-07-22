@@ -60,3 +60,31 @@ def test_intake_parser_accepts_null_optional_lists():
     assert result.request.design_requirements == []
     assert result.missing_fields == []
     assert result.follow_up_questions == []
+
+
+def test_intake_guardrail_recovers_chinese_single_age(monkeypatch):
+    def fake_llm(_prompt: str) -> str:
+        return """
+        {
+          "summary": "User wants to create a Python course for about 9 children.",
+          "missing_fields": ["age_bracket"],
+          "follow_up_questions": ["What age bracket is the course for?"],
+          "confidence": "medium",
+          "course_request": null
+        }
+        """
+
+    monkeypatch.setattr("agent_a.intake._call_llm", fake_llm)
+
+    result = run_intake(
+        ["我想做一门python课程，大概9岁的孩子"],
+        use_llm=True,
+    )
+
+    assert result.ready
+    assert result.request is not None
+    assert result.request.subject == Subject.CODING
+    assert result.request.age_bracket == AgeBracket.EXPLORERS
+    assert result.request.topic == "Python fundamentals"
+    assert result.missing_fields == []
+    assert result.follow_up_questions == []

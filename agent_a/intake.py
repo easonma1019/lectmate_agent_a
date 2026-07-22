@@ -187,6 +187,10 @@ Allowed subjects: {_enum_values(Subject)}
 Allowed age brackets: {_enum_values(AgeBracket)}
 Allowed planning modes: {_enum_values(PlanningMode)}
 
+Important language rule:
+- In Chinese, phrases like "9岁的孩子" or "孩子大概9岁" mean the learner age
+  is 9 years old. Do not interpret them as a class size of 9 children.
+
 Choose planning_mode:
 - "fixed" if the designer already has clear pedagogy/constraints and mainly
   wants the existing course-structure generator.
@@ -242,18 +246,65 @@ def _parse_intake_payload(payload: dict) -> IntakeResult:
     )
 
 
+def _request_summary(request: CourseRequest) -> str:
+    return (
+        f"Draft request: {request.subject.value} course on {request.topic} "
+        f"for {request.age_bracket.value} learners."
+    )
+
+
+def _with_heuristic_guardrails(llm_result: IntakeResult, heuristic: IntakeResult) -> IntakeResult:
+    """Use deterministic extraction for simple facts the LLM can misread."""
+    if llm_result.request is None:
+        if heuristic.request is None:
+            return llm_result
+        return IntakeResult(
+            request=heuristic.request,
+            summary=_request_summary(heuristic.request),
+            missing_fields=[],
+            follow_up_questions=[],
+            confidence=llm_result.confidence,
+        )
+
+    if heuristic.request is None:
+        return llm_result
+
+    request = llm_result.request.model_copy(
+        update={
+            "subject": heuristic.request.subject,
+            "age_bracket": heuristic.request.age_bracket,
+            "topic": heuristic.request.topic or llm_result.request.topic,
+            "max_modules": heuristic.request.max_modules or llm_result.request.max_modules,
+            "planning_mode": heuristic.request.planning_mode,
+        }
+    )
+    missing_fields = [
+        field
+        for field in llm_result.missing_fields
+        if field not in {"subject", "age_bracket", "topic"}
+    ]
+    return IntakeResult(
+        request=request,
+        summary=_request_summary(request),
+        missing_fields=missing_fields,
+        follow_up_questions=llm_result.follow_up_questions if missing_fields else [],
+        confidence=llm_result.confidence,
+    )
+
+
 def run_intake(
     messages: list[str],
     use_llm: bool = True,
 ) -> IntakeResult:
     transcript = "\n".join(messages)
+    heuristic = _heuristic_intake(transcript)
     if not use_llm:
-        return _heuristic_intake(transcript)
+        return heuristic
 
     parsed = _parse_json(_call_llm(_intake_prompt(transcript)))
     if not isinstance(parsed, dict):
         raise ValueError("Intake response must be a JSON object.")
-    return _parse_intake_payload(parsed)
+    return _with_heuristic_guardrails(_parse_intake_payload(parsed), heuristic)
 
 
 def write_intake_request(
