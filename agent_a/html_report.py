@@ -214,6 +214,75 @@ def _module_package_rows(spec: CourseSpec) -> str:
     return "\n".join(rows)
 
 
+def _addie_section(spec: CourseSpec) -> str:
+    analysis = spec.addie.analysis
+    design = spec.addie.design
+    return f"""
+    <section class="page">
+      <h2>ADDIE Analysis & Design</h2>
+      <div class="section-grid">
+        <div class="mini-card">
+          <h3>Analyze Phase</h3>
+          <dl>
+            <div>
+              <dt>Target Audience</dt>
+              <dd>{escape(analysis.target_audience or "Not specified")}</dd>
+            </div>
+            <div>
+              <dt>Learner Context</dt>
+              <dd>{escape(analysis.learner_context or "Not specified")}</dd>
+            </div>
+          </dl>
+          <h4>Prior Knowledge</h4>
+          <ul>{_items(analysis.prior_knowledge_assumptions)}</ul>
+          <h4>Learner Needs</h4>
+          <ul>{_items(analysis.learner_needs)}</ul>
+          <h4>Resources & Constraints</h4>
+          <ul>{_items(analysis.resource_constraints)}</ul>
+        </div>
+        <div class="mini-card">
+          <h3>Design Phase</h3>
+          <dl>
+            <div>
+              <dt>Instructional Strategy</dt>
+              <dd>{escape(design.instructional_strategy or "Not specified")}</dd>
+            </div>
+            <div>
+              <dt>Sequence Rationale</dt>
+              <dd>{escape(design.module_sequence_rationale or "Not specified")}</dd>
+            </div>
+            <div>
+              <dt>Assessment Strategy</dt>
+              <dd>{escape(design.assessment_strategy or "Not specified")}</dd>
+            </div>
+            <div>
+              <dt>Engagement Strategy</dt>
+              <dd>{escape(design.engagement_strategy or "Not specified")}</dd>
+            </div>
+            <div>
+              <dt>Differentiation</dt>
+              <dd>{escape(design.differentiation_strategy or "Not specified")}</dd>
+            </div>
+          </dl>
+          <h4>Success Criteria</h4>
+          <ul>{_items(design.success_criteria)}</ul>
+        </div>
+        <div class="mini-card">
+          <h3>Designer Requirements</h3>
+          <ul>{_items(analysis.designer_requirements)}</ul>
+        </div>
+        <div class="mini-card">
+          <h3>Open Questions & Revision Notes</h3>
+          <h4>Open Questions</h4>
+          <ul>{_items(analysis.open_questions)}</ul>
+          <h4>Revision Notes</h4>
+          <ul>{_items(design.revision_notes)}</ul>
+        </div>
+      </div>
+    </section>
+    """
+
+
 def render_course_spec_html(spec: CourseSpec) -> str:
     """Render Level A, B, and C course pages in one self-contained HTML file."""
 
@@ -504,6 +573,10 @@ def render_course_spec_html(spec: CourseSpec) -> str:
         </p>
       </div>
       <div class="info">
+        <div class="label">Planning Mode</div>
+        <div class="value">{escape(spec.planning_mode.value)}</div>
+      </div>
+      <div class="info">
         <div class="label">Schema</div>
         <div class="value">{escape(spec.schema_version)}</div>
       </div>
@@ -601,6 +674,8 @@ def render_course_spec_html(spec: CourseSpec) -> str:
         </div>
       </div>
     </section>
+
+    {_addie_section(spec)}
 
     <section class="page">
       <h2>Automation Packaging</h2>

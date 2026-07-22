@@ -1,5 +1,8 @@
 from .schemas import (
     AgeBracket,
+    ADDIEAnalysis,
+    ADDIEDesign,
+    ADDIEPlan,
     ComponentBankSpec,
     CourseOverview,
     CoursePackagingPlan,
@@ -8,12 +11,16 @@ from .schemas import (
     CourseSpec,
     ModulePackageSpec,
     ModuleSpec,
+    PlanningMode,
     Subject,
 )
 from .planner import plan_course, rule_check
 
 __all__ = [
     "AgeBracket",
+    "ADDIEAnalysis",
+    "ADDIEDesign",
+    "ADDIEPlan",
     "ComponentBankSpec",
     "CourseOverview",
     "CoursePackagingPlan",
@@ -22,6 +29,7 @@ __all__ = [
     "CourseSpec",
     "ModulePackageSpec",
     "ModuleSpec",
+    "PlanningMode",
     "Subject",
     "plan_course",
     "rule_check",

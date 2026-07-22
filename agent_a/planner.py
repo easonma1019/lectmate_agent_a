@@ -34,11 +34,15 @@ from openai import OpenAI
 from . import pedagogy
 from .concept_graph import PYTHON_CONCEPTS, toposort_check
 from .schemas import (
+    ADDIEAnalysis,
+    ADDIEDesign,
+    ADDIEPlan,
     CourseOverview,
     CoursePhase,
     CourseRequest,
     CourseSpec,
     ModuleSpec,
+    PlanningMode,
     Reference,
 )
 
@@ -127,6 +131,39 @@ def _constraints_block(req: CourseRequest, ped) -> str:
 - Mini-project style for the course finale: {ped.mini_project_type}"""
 
 
+def _planning_mode_block(req: CourseRequest, ped) -> str:
+    requirements = (
+        "\n".join(f"- {item}" for item in req.design_requirements)
+        if req.design_requirements
+        else "- none given"
+    )
+
+    if req.planning_mode == PlanningMode.ADDIE_DISCOVERY:
+        return f"""PLANNING MODE: ADDIE discovery
+Use the Analyze and Design phases of ADDIE before finalizing the structure.
+The local pedagogy matrix is advisory safety guidance for age-appropriate
+pacing, session length, and exercise choices, not the only source of design
+logic.
+
+DESIGNER REQUIREMENTS:
+{requirements}
+
+Analyze phase must reason about target audience, learner context, prior
+knowledge, learner needs, resources/constraints, and open questions.
+
+Design phase must explain the instructional strategy, module sequence rationale,
+assessment strategy, engagement strategy, differentiation strategy, success
+criteria, and revision notes."""
+
+    return f"""PLANNING MODE: fixed pedagogy
+Use the local pedagogy matrix as hard constraints for the course structure.
+
+DESIGNER REQUIREMENTS:
+{requirements}
+
+{_constraints_block(req, ped)}"""
+
+
 def _stage1_prompt(
     req: CourseRequest,
     ped,
@@ -144,7 +181,7 @@ COURSE REQUEST:
 - Age bracket: {req.age_bracket.value}
 - Requester objectives: {req.learning_objectives or "none given — derive sensible ones"}
 
-{_constraints_block(req, ped)}
+{_planning_mode_block(req, ped)}
 
 TASK (stage 1 of 2): propose a high-level module list of exactly {n_modules} modules for this course, in teaching order. For each module give ONLY a short title and the core concept it covers. Where a concept matches one of these canonical concept ids, use that id verbatim: {known}. Otherwise invent a short snake_case id.
 
@@ -167,11 +204,12 @@ def _stage2_prompt(
             - Subject: {req.subject.value}
             - Topic: "{req.topic}"
             - Age bracket: {req.age_bracket.value}
+            - Planning mode: {req.planning_mode.value}
 
             AGREED OUTLINE (do not reorder, do not add or remove modules):
             {json.dumps(outline, indent=2)}
 
-            {_constraints_block(req, ped)}
+            {_planning_mode_block(req, ped)}
 
             For each module produce:
             - "module_id": "m1", "m2", ... in order
@@ -237,6 +275,33 @@ def _stage2_prompt(
               "progress_tracking": ["...", "..."]
             }}
 
+            Also produce "addie" with the Analyze and Design phase record.
+            In fixed mode, keep the same keys but summarize how the fixed
+            pedagogy matrix and designer requirements shaped the plan.
+            In addie mode, use this as the main design rationale.
+
+            The addie object must have exactly this shape:
+            {{
+              "analysis": {{
+                "target_audience": "...",
+                "learner_context": "...",
+                "prior_knowledge_assumptions": ["...", "..."],
+                "learner_needs": ["...", "..."],
+                "resource_constraints": ["...", "..."],
+                "designer_requirements": ["...", "..."],
+                "open_questions": ["...", "..."]
+              }},
+              "design": {{
+                "instructional_strategy": "...",
+                "module_sequence_rationale": "...",
+                "assessment_strategy": "...",
+                "engagement_strategy": "...",
+                "differentiation_strategy": "...",
+                "success_criteria": ["...", "..."],
+                "revision_notes": ["...", "..."]
+              }}
+            }}
+
             Also produce:
             - "relevancy_note": 2-3 sentences on whether "{req.topic}" is current
             and worth teaching in 2026 for this age bracket, noting anything
@@ -255,6 +320,7 @@ def _stage2_prompt(
             Respond with ONLY a JSON object, no prose, no markdown fences:
             {{
               "overview": {{...}},
+              "addie": {{...}},
               "phases": [...],
               "relevancy_note": "...",
               "references": [...],
@@ -598,6 +664,76 @@ def _stub_phases(n_modules: int) -> list[CoursePhase]:
     return phases
 
 
+def _stub_addie(
+    req: CourseRequest,
+    n_modules: int,
+) -> ADDIEPlan:
+    requirements = req.design_requirements or [
+        "Use the default course designer requirements."
+    ]
+    mode_note = (
+        "ADDIE discovery mode explores the course through Analyze and Design before locking the module sequence."
+        if req.planning_mode == PlanningMode.ADDIE_DISCOVERY
+        else "Fixed pedagogy mode applies the local age-tier pedagogy matrix as the primary design frame."
+    )
+
+    return ADDIEPlan(
+        analysis=ADDIEAnalysis(
+            target_audience=req.age_bracket.value,
+            learner_context=(
+                f"Learners are taking a tutor-led {req.subject.value} course "
+                f"on {req.topic}."
+            ),
+            prior_knowledge_assumptions=[
+                "Learners can follow short guided instructions",
+                "Prior topic knowledge is helpful but not assumed",
+            ],
+            learner_needs=[
+                "A clear module sequence with visible prerequisites",
+                "Practice tasks that build confidence before the final project",
+                "A course overview that curriculum designers can review quickly",
+            ],
+            resource_constraints=[
+                "Live sessions should stay within the age-tier time cap",
+                "Outputs must map to slides, exercises, quizzes, and assignments",
+            ],
+            designer_requirements=requirements,
+            open_questions=[
+                "Which learner artifacts should be portfolio-ready?",
+                "Which datasets, tools, or examples should be shared resources?",
+            ],
+        ),
+        design=ADDIEDesign(
+            instructional_strategy=mode_note,
+            module_sequence_rationale=(
+                f"The course uses {n_modules} ordered modules so each module "
+                "depends only on earlier concepts."
+            ),
+            assessment_strategy=(
+                "Each module maps to practice, quiz checks, and assignment "
+                "briefs, with the final module serving as portfolio evidence."
+            ),
+            engagement_strategy=(
+                "Use guided tutor prompts, short practice loops, and a visible "
+                "final project path."
+            ),
+            differentiation_strategy=(
+                "Adjust examples, scaffolding, and session pacing according to "
+                "the learner's age bracket and prior experience."
+            ),
+            success_criteria=[
+                "The module list is coherent and topologically ordered",
+                "The Level A/B/C pages are understandable to a curriculum designer",
+                "Packaging metadata can drive downstream resource generation",
+            ],
+            revision_notes=[
+                "Regenerate from revised objectives or requirements when the course structure changes",
+                "Keep module titles stable once downstream banks are generated",
+            ],
+        ),
+    )
+
+
 def _stub_plan(
     req: CourseRequest,
     ped,
@@ -646,6 +782,7 @@ def _stub_plan(
         subject=req.subject,
         age_bracket=req.age_bracket,
         topic=req.topic,
+        planning_mode=req.planning_mode,
         pedagogy=ped,
         relevancy_note=(
             "[stub] Relevancy check not run — "
@@ -666,6 +803,7 @@ def _stub_plan(
         modules=modules,
         overview=_stub_overview(req, n_modules, ped),
         phases=_stub_phases(n_modules),
+        addie=_stub_addie(req, n_modules),
     )
 
 
@@ -797,6 +935,7 @@ def plan_course(
         subject=req.subject,
         age_bracket=req.age_bracket,
         topic=req.topic,
+        planning_mode=req.planning_mode,
         pedagogy=ped,
         relevancy_note=expanded.get(
             "relevancy_note",
@@ -826,6 +965,12 @@ def plan_course(
                 [],
             )
         ],
+        addie=ADDIEPlan(
+            **expanded.get(
+                "addie",
+                {},
+            )
+        ),
     )
 
     # -----------------------------------------------------------------------
@@ -879,6 +1024,12 @@ def plan_course(
                     **repaired.get(
                         "overview",
                         spec.overview.model_dump(),
+                    )
+                ),
+                "addie": ADDIEPlan(
+                    **repaired.get(
+                        "addie",
+                        spec.addie.model_dump(),
                     )
                 ),
                 "phases": [

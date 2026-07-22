@@ -6,7 +6,7 @@ company asked for in the 2 Jul meeting.
 import pytest
 from pydantic import ValidationError
 
-from agent_a import AgeBracket, CourseRequest, Subject, plan_course, rule_check
+from agent_a import AgeBracket, CourseRequest, PlanningMode, Subject, plan_course, rule_check
 from agent_a.concept_graph import toposort_check
 from agent_a.html_report import render_course_spec_html, write_course_spec_html
 from agent_a.pedagogy import lookup
@@ -70,7 +70,7 @@ def test_html_report_renders_course_review_page(tmp_path):
 def test_packaging_plan_derives_resource_bank_structure():
     spec = plan_course(_req(max_modules=2), use_llm=False)
 
-    assert spec.schema_version == "0.4.0"
+    assert spec.schema_version == "0.5.0"
     assert spec.packaging.exercises_per_module == 6
     assert spec.packaging.quiz_questions_per_module == 10
     assert spec.packaging.assignments_per_module == 3
@@ -85,6 +85,27 @@ def test_packaging_plan_derives_resource_bank_structure():
     assert first_package.exercises_file == "Module 1 - Exercises.pptx"
     assert first_package.questions_file == "Module 1 - Questions.pptx"
     assert first_package.assignments_file == "Module 1 - Assignments.pptx"
+
+
+def test_addie_mode_records_analysis_and_design():
+    spec = plan_course(
+        _req(
+            max_modules=2,
+            planning_mode=PlanningMode.ADDIE_DISCOVERY,
+            design_requirements=["Prefer project-based learning"],
+        ),
+        use_llm=False,
+    )
+
+    assert spec.planning_mode == PlanningMode.ADDIE_DISCOVERY
+    assert "Prefer project-based learning" in spec.addie.analysis.designer_requirements
+    assert spec.addie.analysis.target_audience == AgeBracket.CREATORS.value
+    assert spec.addie.design.instructional_strategy
+
+    html = render_course_spec_html(spec)
+    assert "ADDIE Analysis & Design" in html
+    assert "Planning Mode" in html
+    assert "addie" in spec.model_dump()
 
 
 # --- schema guards ----------------------------------------------------------

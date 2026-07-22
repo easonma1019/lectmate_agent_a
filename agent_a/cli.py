@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .html_report import write_course_spec_html
 from .planner import plan_course
-from .schemas import AgeBracket, CourseRequest, Subject
+from .schemas import AgeBracket, CourseRequest, PlanningMode, Subject
 
 
 def main() -> int:
@@ -16,7 +16,19 @@ def main() -> int:
     p.add_argument("--age", required=True, choices=[a.value for a in AgeBracket])
     p.add_argument("--topic", required=True)
     p.add_argument("--objective", action="append", default=[], help="repeatable")
+    p.add_argument(
+        "--requirement",
+        action="append",
+        default=[],
+        help="repeatable course designer requirement or constraint",
+    )
     p.add_argument("--modules", type=int, default=None)
+    p.add_argument(
+        "--mode",
+        default=PlanningMode.FIXED_PEDAGOGY.value,
+        choices=[mode.value for mode in PlanningMode],
+        help="'fixed' uses the pedagogy matrix; 'addie' adds Analyze/Design discovery",
+    )
     p.add_argument("--stub", action="store_true", help="force stub mode (no LLM)")
     p.add_argument("--out", default=None, help="write JSON to file instead of stdout")
     p.add_argument(
@@ -36,7 +48,9 @@ def main() -> int:
         age_bracket=AgeBracket(args.age),
         topic=args.topic,
         learning_objectives=args.objective,
+        design_requirements=args.requirement,
         max_modules=args.modules,
+        planning_mode=PlanningMode(args.mode),
     )
     spec = plan_course(req, use_llm=False if args.stub else None)
     payload = spec.model_dump_json(indent=2)

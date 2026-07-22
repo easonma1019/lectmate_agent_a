@@ -37,6 +37,11 @@ class AgeBracket(str, Enum):
     LEADERS = "Leaders (18-21)"
 
 
+class PlanningMode(str, Enum):
+    FIXED_PEDAGOGY = "fixed"
+    ADDIE_DISCOVERY = "addie"
+
+
 # ---------------------------------------------------------------------------
 # Input: course request
 # ---------------------------------------------------------------------------
@@ -54,7 +59,15 @@ class CourseRequest(BaseModel):
         default_factory=list,
         description="Optional high-level goals from the requester; Agent A refines them.",
     )
+    design_requirements: list[str] = Field(
+        default_factory=list,
+        description="Course designer requirements, constraints, or preferences.",
+    )
     max_modules: Optional[int] = Field(default=None, ge=1, le=20)
+    planning_mode: PlanningMode = Field(
+        default=PlanningMode.FIXED_PEDAGOGY,
+        description="'fixed' uses the local pedagogy matrix; 'addie' performs Analyze/Design discovery.",
+    )
     source: str = Field(
         default="manual",
         description="Where the request came from: 'manual' | 'trend_agent' | ...",
@@ -200,6 +213,37 @@ class CoursePackagingPlan(BaseModel):
     assignments_per_module: int = 3
 
 
+class ADDIEAnalysis(BaseModel):
+    """Analyze phase output for a new or under-specified course."""
+
+    target_audience: str = Field(default="")
+    learner_context: str = Field(default="")
+    prior_knowledge_assumptions: list[str] = Field(default_factory=list)
+    learner_needs: list[str] = Field(default_factory=list)
+    resource_constraints: list[str] = Field(default_factory=list)
+    designer_requirements: list[str] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
+
+
+class ADDIEDesign(BaseModel):
+    """Design phase output before downstream content development."""
+
+    instructional_strategy: str = Field(default="")
+    module_sequence_rationale: str = Field(default="")
+    assessment_strategy: str = Field(default="")
+    engagement_strategy: str = Field(default="")
+    differentiation_strategy: str = Field(default="")
+    success_criteria: list[str] = Field(default_factory=list)
+    revision_notes: list[str] = Field(default_factory=list)
+
+
+class ADDIEPlan(BaseModel):
+    """The Analyze and Design phases of ADDIE captured for review."""
+
+    analysis: ADDIEAnalysis = Field(default_factory=ADDIEAnalysis)
+    design: ADDIEDesign = Field(default_factory=ADDIEDesign)
+
+
 def _folder_title(module_title: str) -> str:
     title = module_title.strip()
     for separator in (" — ", " – ", " - "):
@@ -319,6 +363,7 @@ class CourseSpec(BaseModel):
     subject: Subject
     age_bracket: AgeBracket
     topic: str
+    planning_mode: PlanningMode = PlanningMode.FIXED_PEDAGOGY
     pedagogy: PedagogyConstraints
     relevancy_note: str = Field(
         default="",
@@ -329,7 +374,8 @@ class CourseSpec(BaseModel):
     overview: CourseOverview = Field(default_factory=CourseOverview)
     phases: list[CoursePhase] = Field(default_factory=list)
     packaging: CoursePackagingPlan = Field(default_factory=CoursePackagingPlan)
-    schema_version: str = "0.4.0"
+    addie: ADDIEPlan = Field(default_factory=ADDIEPlan)
+    schema_version: str = "0.5.0"
 
     @model_validator(mode="after")
     def validate_prerequisite_graph(self) -> "CourseSpec":

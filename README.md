@@ -17,7 +17,7 @@ CourseRequest
    └─ Stage 3  Rule validation (Pydantic schema + concept graph + tier caps);
                one automatic repair round on failure
    ▼
-CourseSpec (JSON, schema v0.4.0)
+CourseSpec (JSON, schema v0.5.0)
 ```
 
 Design decisions traceable to project docs:
@@ -41,9 +41,20 @@ python -m agent_a.cli --subject Coding --age "Creators (10-13)" \
     --topic "Python fundamentals" --stub
 
 # LLM mode (real planning)
-export ANTHROPIC_API_KEY=sk-...
+export OPENROUTER_API_KEY=sk-or-...
 python -m agent_a.cli --subject Coding --age "Creators (10-13)" \
     --topic "Python fundamentals" --out spec.json
+
+# Fixed pedagogy mode (default): use the local age-tier pedagogy matrix
+python -m agent_a.cli --subject Coding --age "Creators (10-13)" \
+    --topic "Python fundamentals" --mode fixed --out spec.json --html review.html
+
+# ADDIE discovery mode: use Analyze/Design reasoning for a new course
+python -m agent_a.cli --subject AI --age "Innovators (14-17)" \
+    --topic "Data visualisation with Python" --mode addie \
+    --requirement "Prefer project-based learning" \
+    --requirement "Include portfolio-ready outputs" \
+    --out spec.json --html review.html
 
 # Human review page (prints a file:// link for curriculum designers)
 python -m agent_a.cli --subject Coding --age "Creators (10-13)" \
@@ -68,6 +79,12 @@ The LLM path now produces `overview` and `phases` fields in addition to the
 machine-readable module list, references, pedagogy constraints, and relevancy
 note. Stub mode generates deterministic display data for local demos.
 
+`--mode fixed` keeps the original flow: the local pedagogy matrix is the hard
+design frame. `--mode addie` adds an `addie` block with Analyze and Design phase
+reasoning, inspired by the Instructional Agents ADDIE workflow, while still
+keeping age-appropriate safety constraints and the same CourseSpec handoff.
+Use repeatable `--requirement` flags to pass curriculum-designer preferences.
+
 The schema also derives a `packaging` block from the module list. This captures
 the automation contract from `Course_Component_Structure.docx`: Course Slides,
 Exercise Bank, Quiz Bank, Assignment Bank, and Additional resources; per-module
@@ -84,6 +101,20 @@ spec = plan_course(req)          # auto: LLM if key present, stub otherwise
 print(spec.model_dump_json(indent=2))
 ```
 
+## Revision workflow
+
+Today the generated `spec.json` and `review.html` are static outputs. To change
+the course structure, change the source request and regenerate:
+
+- adjust `--topic`, `--age`, `--modules`, `--objective`, `--requirement`, or
+  `--mode`
+- rerun the CLI to produce a new JSON/HTML pair
+- review the new `review.html`
+
+Once downstream resource banks have been generated, keep module titles stable
+where possible because `Module N - <Title>` is the join key across slides,
+exercises, quizzes, assignments, and packaging metadata.
+
 ## Schema changes vs Game Plan §4.1 (⚠ needs team sign-off)
 
 Added fields — raise with B & C owners and log in the shared changelog:
@@ -95,6 +126,8 @@ Added fields — raise with B & C owners and log in the shared changelog:
 - `overview` and `phases` — Level A/B/C page data for product display
 - `packaging` — resource-bank, split-file, and validation metadata derived from
   the module list
+- `addie` — Analyze and Design phase record for new-course discovery and
+  curriculum-designer review
 - `schema_version` — for changelog tracking
 
 ## Known gaps / next steps
