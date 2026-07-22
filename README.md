@@ -60,6 +60,15 @@ python -m agent_a.cli --subject AI --age "Innovators (14-17)" \
 python -m agent_a.cli --subject Coding --age "Creators (10-13)" \
     --topic "Python fundamentals" --stub --out spec.json --html review.html
 
+# Intake chatbot: clarify designer needs before generation
+python -m agent_a.intake_cli --stub \
+    --message "我想做一门 AI 课程，主题是 Data visualisation with Python，面向 14-17 岁学生，使用 addie 模式，最好项目制，8 个模块。" \
+    --out course_request.json
+
+# Generate from the confirmed intake request
+python -m agent_a.cli --request course_request.json \
+    --stub --out spec.json --html review.html
+
 # Revision flow: old JSON + change request -> new JSON/HTML/report
 python -m agent_a.revise --in spec.json \
     --change "把课程改成 8 个模块，并加强项目制学习" \
@@ -128,6 +137,21 @@ Use `--stub` for deterministic local testing without an API key. With
 Once downstream resource banks have been generated, keep module titles stable
 where possible because `Module N - <Title>` is the join key across slides,
 exercises, quizzes, assignments, and packaging metadata.
+
+## Intake chatbot workflow
+
+The intake chatbot is the front door for curriculum designers. It does not
+generate the course directly. It turns a conversation into a confirmed
+`CourseRequest`:
+
+1. Gather subject, age bracket, topic, planning mode, objectives, requirements,
+   and optional module count
+2. Ask follow-up questions when required fields are missing
+3. Write `course_request.json` once the request is ready
+4. Pass that request into `agent_a.cli` for fixed/addie generation
+
+Use `--stub` for deterministic local extraction. With `OPENROUTER_API_KEY` set,
+the intake chatbot can use the LLM to summarize messier conversations.
 
 ## Schema changes vs Game Plan §4.1 (⚠ needs team sign-off)
 

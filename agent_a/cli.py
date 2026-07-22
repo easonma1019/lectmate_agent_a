@@ -12,9 +12,10 @@ from .schemas import AgeBracket, CourseRequest, PlanningMode, Subject
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Agent A — Curriculum Architect")
-    p.add_argument("--subject", required=True, choices=[s.value for s in Subject])
-    p.add_argument("--age", required=True, choices=[a.value for a in AgeBracket])
-    p.add_argument("--topic", required=True)
+    p.add_argument("--request", default=None, help="read CourseRequest JSON from intake")
+    p.add_argument("--subject", choices=[s.value for s in Subject])
+    p.add_argument("--age", choices=[a.value for a in AgeBracket])
+    p.add_argument("--topic")
     p.add_argument("--objective", action="append", default=[], help="repeatable")
     p.add_argument(
         "--requirement",
@@ -43,15 +44,31 @@ def main() -> int:
     )
     args = p.parse_args()
 
-    req = CourseRequest(
-        subject=Subject(args.subject),
-        age_bracket=AgeBracket(args.age),
-        topic=args.topic,
-        learning_objectives=args.objective,
-        design_requirements=args.requirement,
-        max_modules=args.modules,
-        planning_mode=PlanningMode(args.mode),
-    )
+    if args.request:
+        req = CourseRequest.model_validate_json(
+            Path(args.request).read_text(encoding="utf-8")
+        )
+    else:
+        missing = [
+            name
+            for name, value in {
+                "--subject": args.subject,
+                "--age": args.age,
+                "--topic": args.topic,
+            }.items()
+            if value is None
+        ]
+        if missing:
+            p.error("required unless --request is used: " + ", ".join(missing))
+        req = CourseRequest(
+            subject=Subject(args.subject),
+            age_bracket=AgeBracket(args.age),
+            topic=args.topic,
+            learning_objectives=args.objective,
+            design_requirements=args.requirement,
+            max_modules=args.modules,
+            planning_mode=PlanningMode(args.mode),
+        )
     spec = plan_course(req, use_llm=False if args.stub else None)
     payload = spec.model_dump_json(indent=2)
     if args.out:
