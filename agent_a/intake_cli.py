@@ -5,25 +5,61 @@ import argparse
 import os
 import sys
 
-from .intake import render_intake_summary, run_intake, write_intake_request
+from .intake import IntakeResult, render_intake_summary, run_intake, write_intake_request
 
 
-def _interactive_messages() -> list[str]:
+def _print_turn_feedback(result: IntakeResult) -> None:
+    print("\n--- Intake status ---")
+    print(f"Ready: {'yes' if result.ready else 'no'}")
+    print(f"Confidence: {result.confidence}")
+    if result.summary:
+        print(f"Summary: {result.summary}")
+    if result.request is not None:
+        req = result.request
+        print("Current draft:")
+        print(f"- subject: {req.subject.value}")
+        print(f"- age_bracket: {req.age_bracket.value}")
+        print(f"- topic: {req.topic}")
+        print(f"- planning_mode: {req.planning_mode.value}")
+        print(f"- max_modules: {req.max_modules}")
+        if req.design_requirements:
+            print("- design_requirements:")
+            for item in req.design_requirements:
+                print(f"  - {item}")
+    if result.follow_up_questions:
+        print("Follow-up questions:")
+        for question in result.follow_up_questions:
+            print(f"- {question}")
+    print("---------------------\n")
+
+
+def _interactive_result(use_llm: bool) -> IntakeResult:
     print(
         "Course design intake. Type one message per turn. "
-        "Submit an empty line when ready to summarize.",
+        "Type 'confirm' to save when ready, or an empty line to summarize and exit.",
         file=sys.stderr,
     )
     messages = []
+    latest_result: IntakeResult | None = None
     while True:
         try:
             message = input("> ").strip()
         except EOFError:
             break
+        if message.lower() in {"confirm", "确认"}:
+            if latest_result is None:
+                latest_result = run_intake(messages, use_llm=use_llm)
+            return latest_result
         if not message:
             break
+        if message.lower() in {"quit", "exit", "退出"}:
+            break
         messages.append(message)
-    return messages
+        latest_result = run_intake(messages, use_llm=use_llm)
+        _print_turn_feedback(latest_result)
+    if latest_result is not None:
+        return latest_result
+    return run_intake(messages, use_llm=use_llm)
 
 
 def main() -> int:
@@ -53,12 +89,6 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    messages = list(args.message)
-    if args.interactive:
-        messages.extend(_interactive_messages())
-    if not messages:
-        parser.error("provide at least one --message or use --interactive")
-
     use_llm = not args.stub
     if use_llm and not os.environ.get("OPENROUTER_API_KEY"):
         print(
@@ -67,7 +97,15 @@ def main() -> int:
         )
         use_llm = False
 
-    result = run_intake(messages, use_llm=use_llm)
+    messages = list(args.message)
+    if not messages and not args.interactive:
+        parser.error("provide at least one --message or use --interactive")
+
+    result = (
+        _interactive_result(use_llm)
+        if args.interactive
+        else run_intake(messages, use_llm=use_llm)
+    )
     print(render_intake_summary(result))
 
     if args.out:

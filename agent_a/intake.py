@@ -70,6 +70,18 @@ def _infer_age(text: str) -> AgeBracket | None:
         if low >= 18 and high <= 21:
             return AgeBracket.LEADERS
 
+    single = re.search(r"(\d{1,2})\s*(?:岁|years?\s*old|yo)", text, re.IGNORECASE)
+    if single:
+        age = int(single.group(1))
+        if 6 <= age <= 9:
+            return AgeBracket.EXPLORERS
+        if 10 <= age <= 13:
+            return AgeBracket.CREATORS
+        if 14 <= age <= 17:
+            return AgeBracket.INNOVATORS
+        if 18 <= age <= 21:
+            return AgeBracket.LEADERS
+
     lowered = text.lower()
     for age in AgeBracket:
         if age.value.lower() in lowered or age.name.lower() in lowered:
@@ -99,6 +111,10 @@ def _infer_module_count(text: str) -> int | None:
 
 
 def _heuristic_topic(text: str) -> str:
+    lowered = text.lower()
+    if "python" in lowered:
+        return "Python fundamentals"
+
     quoted = re.findall(r"[\"'“”‘’]([^\"'“”‘’]{3,80})[\"'“”‘’]", text)
     if quoted:
         return quoted[0].strip()
